@@ -6,6 +6,7 @@ const Render = (() => {
   const OUT = Art.OUT;
   let spriteScale = 0;
   let groundPattern = null;
+  let patternTried = false;
   let fxRed = null;     // 画面効果は CSS のオーバーレイ(キャンバスを全面塗りしないので軽い)
   let fxPurple = null;
   let fxLast = { r: -1, p: -1 };
@@ -17,8 +18,9 @@ const Render = (() => {
     const canvas = G.canvas;
     const W = window.innerWidth;
     const H = window.innerHeight;
-    let dpr = Math.min(window.devicePixelRatio || 1, CONFIG.view.maxDpr);
-    while (W * H * dpr * dpr > CONFIG.view.maxPixels && dpr > 0.6) dpr *= 0.9;
+    // 重い端末では G.rs(描画の細かさ)を下げて軽くする
+    let dpr = Math.min(window.devicePixelRatio || 1, CONFIG.view.maxDpr) * (G.rs || 1);
+    while (W * H * dpr * dpr > CONFIG.view.maxPixels && dpr > 0.5) dpr *= 0.9;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px';
@@ -29,7 +31,7 @@ const Render = (() => {
     const v = G.view;
     v.W = W; v.H = H; v.dpr = dpr; v.zoom = zoom; v.vw = W / zoom; v.vh = H / zoom;
     const need = clamp(Math.ceil(zoom * dpr), 1, 4);
-    if (need !== spriteScale) { spriteScale = need; Art.init(need); groundPattern = null; }
+    if (need !== spriteScale) { spriteScale = need; Art.init(need); groundPattern = null; patternTried = false; }
     // ミニマップの解像度
     const mm = G.mini;
     if (mm) {
@@ -39,8 +41,12 @@ const Render = (() => {
   }
 
   function makeGroundPattern(ctx) {
+    patternTried = true;
     const TILE_U = 320;
-    const ps = Math.max(1, spriteScale);
+    let ps = Math.max(1, spriteScale);
+    const test = ctx.createPattern(document.createElement('canvas'), 'repeat');
+    const canScale = !!(test && typeof test.setTransform === 'function' && typeof DOMMatrix !== 'undefined');
+    if (!canScale) ps = 1; // 拡大縮小できないときは 1px=1ユニットのまま使う
     const c = document.createElement('canvas');
     c.width = TILE_U * ps; c.height = TILE_U * ps;
     const g = c.getContext('2d');
@@ -61,7 +67,9 @@ const Render = (() => {
       wrap(x, y, (px, py) => { g.beginPath(); g.moveTo(px, py); g.lineTo(px + (rnd() - 0.5) * 3, py - 4 - rnd() * 4); g.stroke(); });
     }
     groundPattern = ctx.createPattern(c, 'repeat');
-    try { groundPattern.setTransform(new DOMMatrix().scale(1 / ps)); } catch (e) { groundPattern = null; }
+    if (canScale && groundPattern) {
+      try { groundPattern.setTransform(new DOMMatrix().scale(1 / ps)); } catch (e) { groundPattern = null; }
+    }
   }
 
   // ---------- 川・池・橋 ----------
@@ -407,7 +415,7 @@ const Render = (() => {
     const right = left + V.vw;
     const bottom = top + V.vh;
     const k = V.dpr * V.zoom;
-    if (!groundPattern) makeGroundPattern(ctx);
+    if (!groundPattern && !patternTried) makeGroundPattern(ctx);
 
     ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
     ctx.fillStyle = '#86d257';
@@ -583,5 +591,14 @@ const Render = (() => {
     g.restore();
   }
 
-  return { resize, draw, buildMini, drawMini, FONT };
+  // 動きが重いときに描画の細かさを1段階下げる(0.5 まで)。下げたら戻さない(行き来してカクつくのを避ける)
+  function lowerQuality() {
+    const cur = G.rs || 1;
+    if (cur <= 0.55) return false;
+    G.rs = Math.max(0.5, cur * 0.8);
+    resize();
+    return true;
+  }
+
+  return { resize, draw, buildMini, drawMini, lowerQuality, FONT };
 })();

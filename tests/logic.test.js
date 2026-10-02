@@ -8,7 +8,7 @@ const vm = require('vm');
 // ブラウザ用の通常スクリプトを、1つの共有コンテキストに順番に読み込む
 const ctx = vm.createContext({ console, Math, Uint8Array, Int32Array, Map });
 for (const f of ['util', 'config', 'world']) {
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'js', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 }
 const $ = (expr) => vm.runInContext(expr, ctx);
 

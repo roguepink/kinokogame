@@ -238,6 +238,7 @@ function hurtPlayer(dmg, sx, sy, kb) {
   floatText(P.x, P.y - 56, '-' + dmg, '#ff5a5a', 26);
   burst(P.x, P.y - 22, 10, { s0: 60, s1: 170, l0: 0.25, l1: 0.5, z0: 2, z1: 4.5, color: ['#fff', '#ffd24d', '#ff7a5a'], shape: 'spark' });
   Sound.sfx.hurt();
+  if (navigator.vibrate && Input.isTouch()) { try { navigator.vibrate(dmg >= 18 ? [60, 30, 60] : 50); } catch (e) { /* 振動できない端末は無視 */ } }
   if (P.hp <= 0) endGame('down');
   return true;
 }

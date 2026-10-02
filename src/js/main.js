@@ -9,7 +9,7 @@ const UI = {
   last: {},
   init() {
     for (const id of ['hud', 'hpFill', 'hpText', 'score', 'combo', 'comboN', 'comboM', 'comboFill', 'chips', 'timer', 'btnSound', 'btnPause', 'toast', 'banner', 'hint',
-      'title', 'pause', 'result', 'btnStart', 'btnResume', 'btnQuit', 'btnRetry', 'btnToTitle', 'bestTitle', 'resTitle', 'resRank', 'resMsg', 'resScore', 'resNew', 'resStats']) {
+      'title', 'pause', 'result', 'touchHints', 'thL', 'thR', 'btnStart', 'btnResume', 'btnQuit', 'btnRetry', 'btnToTitle', 'bestTitle', 'resTitle', 'resRank', 'resMsg', 'resScore', 'resNew', 'resStats']) {
       this.el[id] = $(id);
     }
   },
@@ -97,6 +97,12 @@ function startGame() {
   UI.show('hint', true);
   clearTimeout(G.hintTimer);
   G.hintTimer = setTimeout(() => UI.show('hint', false), 8000);
+  // スマホ: 操作ガイドの輪っかを出す(さわった側から消える。12秒でぜんぶ消える)
+  for (const id of ['thL', 'thR']) UI.el[id].classList.remove('gone');
+  UI.el.touchHints.classList.add('show');
+  clearTimeout(G.thTimer);
+  G.thTimer = setTimeout(() => UI.el.touchHints.classList.remove('show'), 12000);
+  requestWakeLock();
   // カメラはすぐにプレイヤーへ
   G.cam.x = G.player.x; G.cam.y = G.player.y;
 }
@@ -151,6 +157,29 @@ function setPaused(p) {
   if (p) Input.releaseAll();
 }
 
+// ---------- スマホ向けの補助 ----------
+// 遊んでいる間は画面が暗くならないようにする(使えない端末では何もしない)
+let wakeLock = null;
+function requestWakeLock() {
+  try {
+    if (!navigator.wakeLock || document.hidden || wakeLock) return;
+    navigator.wakeLock.request('screen').then((l) => { wakeLock = l; l.addEventListener('release', () => { wakeLock = null; }); }).catch(() => { /* 許可されなくても遊べる */ });
+  } catch (e) { /* 無視 */ }
+}
+
+// 動きが重い端末では、描画の細かさを自動で下げる(コマ落ちを減らす)
+const perf = { ema: 1 / 60, next: 0, lowered: 0 };
+function watchPerformance(rawDt, now) {
+  if (G.paused || G.state === 'title' || rawDt <= 0 || rawDt > 0.25) return; // 一時停止・タブ切り替え直後は数えない
+  perf.ema = perf.ema * 0.94 + rawDt * 0.06;
+  if (now < perf.next) return;
+  if (perf.ema > 0.027) { // 平均 37fps より遅い
+    if (Render.lowerQuality()) perf.lowered++;
+    perf.ema = 1 / 60;
+    perf.next = now + 3;
+  }
+}
+
 // ---------- カメラ ----------
 function updateCamera(dt) {
   const V = G.view;
@@ -192,8 +221,10 @@ let lastTs = 0;
 function loop(ts) {
   requestAnimationFrame(loop);
   const now = ts / 1000;
-  const dt = Math.min(Math.max(now - lastTs, 0), 0.1);
+  const rawDt = now - lastTs;
+  const dt = Math.min(Math.max(rawDt, 0), 0.1);
   lastTs = now;
+  if (lastTs > 0 && rawDt < 1) watchPerformance(rawDt, now);
   if (!G.paused) {
     G.clock += dt;
     let rem = dt;
@@ -229,7 +260,11 @@ function boot() {
   Render.buildMini();
   G.cam.x = G.player.x + 120; G.cam.y = G.player.y;
 
-  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+  // スマホ・タブレットかどうか: 指が主な入力、または指しか使えない端末
+  const mq = (q) => window.matchMedia && window.matchMedia(q).matches;
+  if (mq('(pointer: coarse)') || (navigator.maxTouchPoints > 0 && !mq('(any-pointer: fine)'))) document.body.classList.add('touch');
+  // 最初にさわったのがボタンでも「スマホ」と分かるように、画面のどこでも指でさわったら切りかえる
+  document.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') document.body.classList.add('touch'); }, true);
   Input.attach(G.canvas, $('stickL'), $('stickR'), {
     onKey(code) {
       if (code === 'KeyP' || code === 'Escape') { if (G.state === 'playing') setPaused(!G.paused); }
@@ -240,6 +275,7 @@ function boot() {
         else if (G.paused) setPaused(false);
       }
     },
+    onStick(side) { UI.el[side === 'L' ? 'thL' : 'thR'].classList.add('gone'); },
     onFirstInput() {
       Sound.init();
       if (Input.isTouch()) document.body.classList.add('touch');
@@ -260,7 +296,7 @@ function boot() {
 
   window.addEventListener('resize', () => { Render.resize(); });
   window.addEventListener('orientationchange', () => setTimeout(() => Render.resize(), 200));
-  document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); else if (G.state === 'playing') requestWakeLock(); });
   window.addEventListener('blur', () => { if (G.state === 'playing') setPaused(true); });
 
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');
@@ -269,7 +305,7 @@ function boot() {
   drawMapIcon($('ic-map'));
 
   // 動作確認用: URL に ?debug を付けるとコンソールから状態を触れる
-  if (/[?&]debug/.test(location.search)) window.__kinoko = { G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
+  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
 
   requestAnimationFrame(loop);
 }

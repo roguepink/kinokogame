@@ -44,6 +44,10 @@ const Input = (() => {
     window.addEventListener('blur', () => { keys.clear(); mouse.down = false; releaseAll(); });
 
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    // スマホのブラウザのスクロール・ピンチ拡大・ダブルタップ拡大を止める
+    canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault());
     canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse') {
         if (e.button !== 0) return;
@@ -58,6 +62,7 @@ const Input = (() => {
       s.id = e.pointerId; s.ox = s.x = e.clientX; s.oy = s.y = e.clientY;
       try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* 無視 */ }
       setStickDom(side, true);
+      if (hooks.onStick) hooks.onStick(side);
       if (hooks.onFirstInput) hooks.onFirstInput();
     });
     canvas.addEventListener('pointermove', (e) => {
