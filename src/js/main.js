@@ -70,11 +70,14 @@ const UI = {
     // 状態アイコン(どく・スピードアップ)
     const slow = P.slowT > 0;
     const boost = P.boostT > 0;
-    this.set('chipsKey', (slow ? 1 : 0) + (boost ? 2 : 0), () => {
-      e.chips.innerHTML = (slow ? '<div class="chip poison">どく のろのろ<i id="chipSlow"></i></div>' : '') + (boost ? '<div class="chip boost">スピードアップ<i id="chipBoost"></i></div>' : '');
+    const power = G.power > 0;
+    this.set('chipsKey', (slow ? 1 : 0) + (boost ? 2 : 0) + (power ? 4 : 0), () => {
+      e.chips.innerHTML = (power ? '<div class="chip power">ゴールドパワー<i id="chipPower"></i><div class="chip-bar"><div id="chipPowerFill"></div></div></div>' : '')
+        + (slow ? '<div class="chip poison">どく のろのろ<i id="chipSlow"></i></div>' : '') + (boost ? '<div class="chip boost">スピードアップ<i id="chipBoost"></i></div>' : '');
     });
     if (slow) { const c = $('chipSlow'); if (c) c.textContent = P.slowT.toFixed(1) + 's'; }
     if (boost) { const c = $('chipBoost'); if (c) c.textContent = P.boostT.toFixed(1) + 's'; }
+    if (power) { const c = $('chipPower'); if (c) c.textContent = G.power.toFixed(1) + 's'; const f = $('chipPowerFill'); if (f) f.style.width = (G.power / CONFIG.power.time) * 100 + '%'; }
   },
 };
 
@@ -125,7 +128,7 @@ function showResult() {
   if (isBest) saveBest(G.score);
   const e = UI.el;
   e.resTitle.textContent = reason === 'time' ? 'タイムアップ!' : 'やられちゃった…';
-  const ranks = [[7000, 'S', 'もりの でんせつ!'], [4000, 'A', 'もりの ヒーロー!'], [2000, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
+  const ranks = [[9000, 'S', 'もりの でんせつ!'], [5000, 'A', 'もりの ヒーロー!'], [2500, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
   const [, letter, msg] = ranks.find((r) => G.score >= r[0]);
   e.resRank.textContent = letter;
   e.resRank.style.background = letter === 'S' ? 'radial-gradient(circle at 35% 30%, #fff6a0, #ff5fb0)' : letter === 'A' ? 'radial-gradient(circle at 35% 30%, #ffe98a, #ff9d2e)' : letter === 'B' ? 'radial-gradient(circle at 35% 30%, #c8f5b0, #43c06a)' : 'radial-gradient(circle at 35% 30%, #d8e6ff, #7a9be0)';
@@ -133,7 +136,7 @@ function showResult() {
   e.resScore.textContent = G.score.toLocaleString('en-US');
   e.resNew.classList.toggle('hidden', !isBest || G.score === 0);
   const s = G.stats;
-  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['おいはらった どうぶつ', s.inked + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
+  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった どうぶつ', s.inked + '匹'], ['体当たりで ふっとばし', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
   e.resStats.innerHTML = rows.map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
   e.bestTitle.textContent = Math.max(prevBest, G.score).toLocaleString('en-US');
   UI.show('result', true);
@@ -198,7 +201,9 @@ function updateCamera(dt) {
   C.x = clamp(C.x, V.vw / 2, S - V.vw / 2);
   C.y = clamp(C.y, V.vh / 2, S - V.vh / 2);
   C.shake = Math.max(0, C.shake - dt * 36);
-  V.left = C.x - V.vw / 2; V.top = C.y - V.vh / 2;
+  const kf = Math.exp(-14 * dt);
+  C.kx = (C.kx || 0) * kf; C.ky = (C.ky || 0) * kf;
+  V.left = C.x + C.kx - V.vw / 2; V.top = C.y + C.ky - V.vh / 2;
 }
 
 // ---------- 1ステップ進める ----------
@@ -227,7 +232,10 @@ function loop(ts) {
   if (lastTs > 0 && rawDt < 1) watchPerformance(rawDt, now);
   if (!G.paused) {
     G.clock += dt;
-    let rem = dt;
+    // 当たった瞬間だけ時間をぐっとおそくする(手ごたえ)
+    let scale = 1;
+    if (G.hitStop > 0) { G.hitStop -= dt; scale = 0.12; }
+    let rem = dt * scale;
     while (rem > 1e-6) { const h = Math.min(rem, 1 / 60); step(h); rem -= h; }
   }
   Render.draw(G.clock);
@@ -250,7 +258,7 @@ function boot() {
   G.canvas = $('game');
   G.ctx = G.canvas.getContext('2d', { alpha: false });
   G.mini = $('minimap');
-  G.cam = { x: 0, y: 0, shake: 0 };
+  G.cam = { x: 0, y: 0, shake: 0, kx: 0, ky: 0 };
   G.view = { left: 0, top: 0 };
   G.clock = 0; G.paused = false; G.state = 'title'; G.dispScore = 0;
   G.world = buildWorld(CONFIG.world.seed);
@@ -300,7 +308,7 @@ function boot() {
   window.addEventListener('blur', () => { if (G.state === 'playing') setPaused(true); });
 
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');
-  for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar']]) Art.drawIcon($(id), what);
+  for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gold', 'gold'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar']]) Art.drawIcon($(id), what);
 
   drawMapIcon($('ic-map'));
 

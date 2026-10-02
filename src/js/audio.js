@@ -61,10 +61,20 @@ const Sound = (() => {
   }
 
   const sfx = {
-    shoot() { noise(0.06, 0.05, 3000, 'highpass'); tone(900, 0.07, 'sine', 0.05, 520); },
+    shoot(power) {
+      // 「ポシュッ」: 息の音 + 低いトン
+      noise(0.07, 0.07, 2600, 'highpass'); tone(power ? 1200 : 820, 0.08, 'sine', 0.06, power ? 700 : 430);
+      tone(power ? 220 : 160, 0.06, 'triangle', 0.09, 60);
+      if (power) tone(1800, 0.05, 'square', 0.02, 2400);
+    },
     splat() { noise(0.09, 0.05, 1400, 'lowpass'); },
     hitEnemy() { tone(240, 0.09, 'square', 0.05, 140); noise(0.05, 0.04, 2500, 'bandpass'); },
-    pop() { [520, 660, 880].forEach((f, i) => tone(f, 0.12, 'sine', 0.09, f * 1.08, i * 0.05)); noise(0.18, 0.04, 5000, 'highpass', 0.05); },
+    // コンボが続くほど音が高くなる
+    pop(combo) {
+      const k = Math.pow(1.06, Math.min(combo || 0, 10));
+      [520, 660, 880].forEach((f, i) => tone(f * k, 0.13, 'sine', 0.1, f * k * 1.08, i * 0.05));
+      noise(0.2, 0.05, 5000, 'highpass', 0.05); tone(120, 0.1, 'sine', 0.12, 50);
+    },
     eat() { [660, 880, 1100, 1320].forEach((f, i) => tone(f, 0.12, 'triangle', 0.09, null, i * 0.06)); },
     poison() { tone(320, 0.55, 'sawtooth', 0.08, 80); tone(330, 0.55, 'square', 0.05, 90, 0.04); },
     hurt() { tone(220, 0.28, 'sawtooth', 0.12, 70); noise(0.2, 0.1, 800, 'lowpass'); },
@@ -77,6 +87,13 @@ const Sound = (() => {
     over() { [523, 440, 349, 262].forEach((f, i) => tone(f, 0.28, 'triangle', 0.12, null, i * 0.2)); },
     timeup() { [523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.11, null, i * 0.11)); },
     click() { tone(700, 0.06, 'square', 0.04); },
+    gold() { [988, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.22, 'triangle', 0.08, null, i * 0.09)); tone(2637, 0.4, 'sine', 0.05, null, 0.36); },
+    power() {
+      [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => { tone(f, 0.3, 'square', 0.05, null, i * 0.07); tone(f, 0.3, 'triangle', 0.08, null, i * 0.07); });
+      tone(60, 0.6, 'sine', 0.25, 30); noise(0.5, 0.12, 900, 'lowpass');
+      [2093, 2637].forEach((f, i) => tone(f, 0.5, 'sine', 0.06, null, 0.45 + i * 0.1));
+    },
+    powerEnd() { [784, 659, 523].forEach((f, i) => tone(f, 0.2, 'triangle', 0.08, null, i * 0.12)); },
   };
 
   // ---- BGM: ペンタトニックの明るいループ ----
