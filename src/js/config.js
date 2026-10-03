@@ -36,6 +36,8 @@ const CONFIG = {
     gorilla: { name: 'ゴリラ',   cr: 23, hr: 36, hp: 17, wander: 52, chase: 112, sight: 450, windup: 0.9,  damage: 16, shock: 112, punch: 12, leap: 0.55, score: 80 },
   },
   director: { start: 3, max: 9, every: 35 }, // 敵の数: 最初 3 匹、35秒ごとに +1、最大 9
+  // ステージ2(まち): ステージ1より少しむずかしい
+  stage2: { director: { start: 4, max: 11, every: 30 }, hpMul: 1.15, speedMul: 1.08, unlockRank: 'B' },
 };
 
 // ゲーム全体の状態を入れる入れ物(main.js で初期化する)

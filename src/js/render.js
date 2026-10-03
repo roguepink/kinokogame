@@ -109,6 +109,27 @@ const Render = (() => {
     }
   }
 
+  // ---------- まち: 道路・歩道 ----------
+  function drawRoads(ctx, t, left, top, right, bottom) {
+    const W = G.world;
+    if (!W.roads) return;
+    const RW = 110; const SW = 34;
+    ctx.lineCap = 'butt';
+    for (const pass of [[RW + SW * 2, '#cfcac0'], [RW + SW * 2 - 4, '#dedad0'], [RW, '#5a5e66'], [RW - 8, '#666a73']]) {
+      ctx.lineWidth = pass[0]; ctx.strokeStyle = pass[1];
+      for (const r of W.roads) { if (r.x0 === r.x1 ? (r.x0 + pass[0] < left || r.x0 - pass[0] > right) : (r.y0 + pass[0] < top || r.y0 - pass[0] > bottom)) continue; ctx.beginPath(); ctx.moveTo(r.x0, r.y0); ctx.lineTo(r.x1, r.y1); ctx.stroke(); }
+    }
+    // センターライン(白い破線)と歩道のタイル線
+    ctx.setLineDash([26, 26]); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    for (const r of W.roads) { ctx.beginPath(); ctx.moveTo(r.x0, r.y0); ctx.lineTo(r.x1, r.y1); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(120,115,105,0.35)'; ctx.lineWidth = 1;
+    for (const r of W.roads) {
+      if (r.x0 === r.x1) { for (const sx of [-1, 1]) { const x = r.x0 + sx * (RW / 2 + SW / 2); if (x < left - 20 || x > right + 20) continue; for (let y = Math.max(top, r.y0); y < Math.min(bottom, r.y1); y += 40) { ctx.beginPath(); ctx.moveTo(x - SW / 2, Math.floor(y / 40) * 40); ctx.lineTo(x + SW / 2, Math.floor(y / 40) * 40); ctx.stroke(); } } }
+      else { for (const sy of [-1, 1]) { const y = r.y0 + sy * (RW / 2 + SW / 2); if (y < top - 20 || y > bottom + 20) continue; for (let x = Math.max(left, r.x0); x < Math.min(right, r.x1); x += 40) { ctx.beginPath(); ctx.moveTo(Math.floor(x / 40) * 40, y - SW / 2); ctx.lineTo(Math.floor(x / 40) * 40, y + SW / 2); ctx.stroke(); } } }
+    }
+  }
+
   // ---------- 川・池・橋 ----------
   function riverPath(r) {
     if (!r.p2d) {
@@ -262,14 +283,13 @@ const Render = (() => {
       case 'boss': {
         ctx.save(); ctx.translate(o.x, o.y);
         if (o.dead) ctx.globalAlpha = Math.max(0, 1 - (t % 100) * 0); // 消えるまでそのまま
-        ctx.scale(o.face || 1, 1);
-        Art.drawBoss(ctx, o, t);
+        if (G.stage === 2) Town.drawBossYankee(ctx, o, t); else { ctx.scale(o.face || 1, 1); Art.drawBoss(ctx, o, t); }
         ctx.restore();
         break;
       }
       case 'critter':
         ctx.save(); ctx.translate(o.x, o.y); ctx.scale(CH, CH);
-        if (o.type === 'rabbit') Art.drawRabbit(ctx, o, t); else Art.drawSquirrel(ctx, o, t);
+        if (o.type === 'rabbit') Art.drawRabbit(ctx, o, t); else if (o.type === 'police') Town.drawPolice(ctx, o, t); else Art.drawSquirrel(ctx, o, t);
         ctx.restore();
         if (o.follow > 0) { ctx.save(); ctx.translate(o.x, o.y - 44 + Math.sin(t * 5) * 2); heartPath(ctx, 0, 0, 6); ctx.fillStyle = '#ff6fa0'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = OUT; ctx.stroke(); ctx.restore(); }
         break;
@@ -278,6 +298,7 @@ const Render = (() => {
         const dir = o.face >= 0 ? 1 : -1;
         const sq = o.flash > 0 ? 1 + o.flash * 0.9 : 1;
         if (o.type === 'boar') { ctx.scale(dir * sq * CH, (2 - sq) * CH); Art.drawBoar(ctx, o, t); }
+        else if (o.type === 'thief' || o.type === 'zombie' || o.type === 'yankee') { ctx.scale(sq * CH, (2 - sq) * CH); (o.type === 'thief' ? Town.drawThief : o.type === 'zombie' ? Town.drawZombie : Town.drawYankee)(ctx, o, t); }
         else { ctx.scale(sq * CH, (2 - sq) * CH); if (o.type === 'bear') Art.drawBear(ctx, o, t); else Art.drawGorilla(ctx, o, t); }
         ctx.restore();
         if (o.state === 'ally') { ctx.save(); ctx.translate(o.x, o.y - 100 + Math.sin(t * 5) * 3); heartPath(ctx, 0, 0, 8); ctx.fillStyle = '#ff8ad0'; ctx.fill(); ctx.lineWidth = 1.8; ctx.strokeStyle = OUT; ctx.stroke(); ctx.restore(); }
@@ -326,6 +347,10 @@ const Render = (() => {
         ctx.globalAlpha = 1;
         break;
       case 'tent': Art.blit(ctx, S.tent[o.v], o.x, o.y, 1); break;
+      case 'building': Town.drawBuilding(ctx, o, t, fade); break;
+      case 'car': Town.drawCar(ctx, o, t); break;
+      case 'lamp': Town.drawLamp(ctx, o, t); break;
+      case 'hydrant': case 'bin': case 'bench': case 'fence': case 'fountain': Town.drawSmall(ctx, o, t); break;
       case 'fire': drawFire(ctx, o, t); break;
       default: break;
     }
@@ -505,6 +530,7 @@ const Render = (() => {
       for (let i = 0; i < 5; i++) { const a = (i / 5) * TAU; Art.circ(ctx, Math.cos(a) * 8, Math.sin(a) * 8, 2, '#c35cff', 0); }
       ctx.restore();
     }
+    for (const d of G.drones || []) { ctx.save(); ctx.translate(d.x, d.y); Town.drawDrone(ctx, d, t); ctx.restore(); }
     for (const bm of G.booms || []) {
       ctx.fillStyle = 'rgba(30,60,40,0.22)'; ctx.beginPath(); ctx.ellipse(bm.x, bm.y + 10, 12 + bm.lv * 3, 5, 0, 0, TAU); ctx.fill();
       ctx.save(); ctx.translate(bm.x, bm.y); ctx.rotate(bm.rot);
@@ -601,11 +627,13 @@ const Render = (() => {
     const blobCol = ['rgba(170,220,100,0.22)', 'rgba(50,130,60,0.2)', 'rgba(200,235,120,0.16)'];
     W.decor.query(left - 280, top - 280, right + 280, bottom + 280, (d) => {
       if (d.kind === 'blob') { ctx.fillStyle = blobCol[d.v]; ctx.beginPath(); ctx.ellipse(d.x, d.y, d.rx, d.ry, 0, 0, TAU); ctx.fill(); }
+      else if (d.kind === 'lawn') { ctx.fillStyle = 'rgba(120,200,90,0.35)'; ctx.fillRect(d.x - d.rx, d.y - d.ry, d.rx * 2, d.ry * 2); ctx.strokeStyle = 'rgba(90,110,60,0.5)'; ctx.lineWidth = 3; ctx.strokeRect(d.x - d.rx, d.y - d.ry, d.rx * 2, d.ry * 2); }
       else if (d.kind === 'dirt') { ctx.fillStyle = 'rgba(150,120,70,0.28)'; ctx.beginPath(); ctx.ellipse(d.x, d.y, d.rx, d.ry, 0, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgba(120,90,50,0.18)'; ctx.beginPath(); ctx.ellipse(d.x + d.rx * 0.1, d.y + d.ry * 0.15, d.rx * 0.6, d.ry * 0.55, 0, 0, TAU); ctx.fill(); }
     });
     drawPaths(ctx, left, top, right, bottom);
 
     mark('ground');
+    if (G.stage === 2) drawRoads(ctx, t, left, top, right, bottom);
     // 川・池
     drawWater(ctx, t, left, top, right, bottom);
     mark('water');
@@ -620,6 +648,8 @@ const Render = (() => {
         case 'fern': Art.blit(ctx, S.fern[d.v], d.x, d.y, 1.1); break;
         case 'shroomlet': Art.blit(ctx, S.shroomlet[d.v], d.x, d.y, 1); break;
         case 'bankstone': Art.blit(ctx, S.bankstone[d.v], d.x, d.y, 1); break;
+        case 'cross': ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot); ctx.fillStyle = 'rgba(255,255,255,0.8)'; for (let i = -4; i <= 4; i++) ctx.fillRect(i * 14 - 5, -14, 10, 28); ctx.restore(); break;
+        case 'manhole': ctx.beginPath(); ctx.arc(d.x, d.y, 12, 0, TAU); ctx.fillStyle = '#4a4e56'; ctx.fill(); ctx.strokeStyle = '#2c2f36'; ctx.lineWidth = 2; ctx.stroke(); ctx.beginPath(); ctx.arc(d.x, d.y, 7, 0, TAU); ctx.stroke(); break;
         case 'leaf': ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot); Art.blit(ctx, S.leaf[d.v], 0, 0, 1); ctx.restore(); break;
         default: break;
       }
@@ -649,7 +679,7 @@ const Render = (() => {
         const img = S.longShadow.c;
         W.hash.query(left - 300, top - 300, right + 100, bottom + 100, (o) => {
           // 木と山だけ(小物は接地の影で十分)
-          if (!(o.kind === 'tree' || o.kind === 'pine' || o.kind === 'willow' || o.kind === 'dead' || o.kind === 'mountain' || o.kind === 'tent')) return;
+          if (!(o.kind === 'tree' || o.kind === 'pine' || o.kind === 'willow' || o.kind === 'dead' || o.kind === 'mountain' || o.kind === 'tent' || o.kind === 'lamp')) return;
           const hw = (o.hw || 30) * 0.9; const hgt = (o.hgt || 60);
           const sx = o.x + hgt * 0.4 * len; const sy = o.y + 10 + hgt * 0.12 * len;
           const rx = hgt * 0.48 * len; const ry = hw * 0.4;
@@ -760,6 +790,7 @@ const Render = (() => {
     c.width = N; c.height = N;
     const g = c.getContext('2d');
     g.fillStyle = '#7fcf5a'; g.fillRect(0, 0, N, N);
+    if (W.roads) { g.strokeStyle = '#6a6e76'; g.lineWidth = 110 / u; for (const r of W.roads) { g.beginPath(); g.moveTo(r.x0 / u, r.y0 / u); g.lineTo(r.x1 / u, r.y1 / u); g.stroke(); } }
     const px = N / W.n;
     for (let ty = 0; ty < W.n; ty++) {
       for (let tx = 0; tx < W.n; tx++) {
@@ -775,6 +806,7 @@ const Render = (() => {
         g.fillStyle = '#9aa5c9'; g.beginPath(); g.moveTo(o.x / u - o.hw / u, o.y / u + 2); g.lineTo(o.x / u, o.y / u - o.hw / u * 1.2); g.lineTo(o.x / u + o.hw / u, o.y / u + 2); g.closePath(); g.fill();
         g.fillStyle = '#fff'; g.beginPath(); g.moveTo(o.x / u - 2, o.y / u - o.hw / u * 0.8); g.lineTo(o.x / u, o.y / u - o.hw / u * 1.2); g.lineTo(o.x / u + 2, o.y / u - o.hw / u * 0.8); g.fill();
       } else if (o.kind === 'tent') { g.fillStyle = '#ff8a5c'; g.beginPath(); g.arc(o.x / u, o.y / u, 2.4, 0, TAU); g.fill(); }
+      else if (o.kind === 'building') { g.fillStyle = o.roof; g.fillRect((o.x - o.hw2) / u, (o.y - o.hh2) / u, (o.hw2 * 2) / u, (o.hh2 * 2) / u); }
     }
     miniBase = c;
   }

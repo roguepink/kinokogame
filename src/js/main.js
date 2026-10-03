@@ -94,14 +94,14 @@ const UI = {
     }
     // ボス
     const B = G.boss;
-    this.set('bossShow', !!(B && !B.dead), (v) => e.bossBar.classList.toggle('hidden', !v));
+    this.set('bossShow', !!(B && !B.dead), (v) => { e.bossBar.classList.toggle('hidden', !v); e.bossBar.querySelector('span').textContent = G.stage === 2 ? 'リーゼント総長' : 'キノコおやかた'; });
     if (B) e.bossFill.style.width = clamp(B.hp / B.maxHp, 0, 1) * 100 + '%';
     // ミッション
     const M = G.missions;
     const cur = M && M.cur;
     this.set('missionShow', !!cur && G.state === 'playing', (v) => e.mission.classList.toggle('hidden', !v));
     if (cur) {
-      this.set('missionText', cur.def.id, () => { e.missionText.textContent = cur.def.text; });
+      this.set('missionText', cur.def.id, () => { e.missionText.textContent = typeof cur.def.text === 'function' ? cur.def.text() : cur.def.text; });
       this.set('missionProg', cur.prog + '/' + cur.def.n, (v) => { e.missionProg.textContent = v; });
     }
     this.set('missionFlash', M && M.flash > 0, (v) => e.mission.classList.toggle('done', !!v));
@@ -175,7 +175,7 @@ function showResult() {
   const isBest = G.score > prevBest;
   if (isBest) saveBest(G.score);
   const e = UI.el;
-  e.resTitle.textContent = reason === 'time' ? 'タイムアップ!' : 'やられちゃった…';
+  e.resTitle.textContent = (G.stage === 2 ? 'まち: ' : 'もり: ') + (reason === 'time' ? 'タイムアップ!' : 'やられちゃった…');
   const ranks = [[12000, 'S', 'もりの でんせつ!'], [7000, 'A', 'もりの ヒーロー!'], [3500, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
   let [, letter, msg] = ranks.find((r) => G.score >= r[0]);
   if (G.stats.boss && letter !== 'S') { letter = String.fromCharCode(letter.charCodeAt(0) - 1); if (letter === '@') letter = 'S'; msg = 'ボスを たおした! ' + msg; }
@@ -185,6 +185,7 @@ function showResult() {
   mh += `<br>きょうのチャレンジ: ${meta.daily.text} → <b>${meta.daily.val}</b> ${meta.daily.star ? '<span class="new">★ たっせい!</span>' : ''}`;
   if (meta.newAch.length) mh += '<br><span class="new">じっせき かくとく: ' + meta.newAch.map((a) => '「' + a.name + '」').join(' ') + '</span>';
   if (meta.loopNew) mh += '<br><span class="new">「2周目の森」が あそべるように なった!</span>';
+  if (meta.stage2New) mh += '<br><span class="new">ステージ2「まち」が あそべるように なった!</span>';
   e.resMeta.innerHTML = mh;
   refreshTitle();
   e.resRank.textContent = letter;
@@ -193,7 +194,7 @@ function showResult() {
   e.resScore.textContent = G.score.toLocaleString('en-US');
   e.resNew.classList.toggle('hidden', !isBest || G.score === 0);
   const s = G.stats;
-  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['ミッション', s.missions + '個'], ['大発生を しずめた', s.outbreaksCleared + '/' + s.outbreaks + '回'], ['キノコおやかた', s.boss ? 'たいじ!' : 'にがした'], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった どうぶつ', s.inked + '匹'], ['体当たりで ふっとばし', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
+  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['ミッション', s.missions + '個'], ['大発生を しずめた', s.outbreaksCleared + '/' + s.outbreaks + '回'], [G.stage === 2 ? 'リーゼント総長' : 'キノコおやかた', s.boss ? 'たいじ!' : 'にがした'], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった どうぶつ', s.inked + '匹'], ['体当たりで ふっとばし', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
   e.resStats.innerHTML = rows.map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
   e.bestTitle.textContent = Math.max(prevBest, G.score).toLocaleString('en-US');
   UI.show('result', true);
@@ -209,6 +210,7 @@ function refreshTitle() {
   e.dailyBox.innerHTML = 'きょうのチャレンジ: <b>' + d.text + '</b>' + (d.best ? ' / きろく ' + d.best : '') + (d.star ? ' <span class="star">★</span>' : '');
   e.loopBox.classList.toggle('hidden', !Meta.loopUnlocked());
   e.loopChk.checked = Meta.loopOn();
+  document.querySelectorAll('[data-stage]').forEach((b) => { const n = +b.dataset.stage; b.classList.toggle('on', G.stage === n); b.classList.toggle('lock', n === 2 && !Meta.stage2Unlocked()); });
 }
 function toTitle() {
   Sound.stopBgm();
@@ -330,7 +332,8 @@ function boot() {
   G.cam = { x: 0, y: 0, shake: 0, kx: 0, ky: 0 };
   G.view = { left: 0, top: 0 };
   G.clock = 0; G.paused = false; G.state = 'title'; G.dispScore = 0;
-  G.world = buildWorld(dailySeed());
+  G.stage = Meta.stage();
+  G.world = buildWorld(dailySeed(), G.stage);
   UI.init();
   { const d = new Date(); $('todayForest').textContent = 'きょうの森 ' + (d.getMonth() + 1) + '/' + d.getDate() + '(まいにち ちがう森)'; }
   renderTable();
@@ -381,6 +384,15 @@ function boot() {
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');
   document.querySelectorAll('[data-meta]').forEach((b) => b.addEventListener('click', () => { Sound.init(); Meta.openPanel(b.dataset.meta); }));
   UI.el.loopChk.addEventListener('change', () => { Meta.setLoop(UI.el.loopChk.checked); resetGame(); });
+  document.querySelectorAll('[data-stage]').forEach((b) => b.addEventListener('click', () => {
+    const n = +b.dataset.stage;
+    if (n === 2 && !Meta.stage2Unlocked()) { UI.toast('ステージ1で ランクB以上を とると あそべるよ', 2600); return; }
+    if (G.stage === n) return;
+    Meta.setStage(n); G.stage = n;
+    G.world = buildWorld(dailySeed(), G.stage); Render.buildMini(); resetGame();
+    G.cam.x = G.player.x + 120; G.cam.y = G.player.y;
+    refreshTitle();
+  }));
   refreshTitle();
   // 説明のイラストは「あそびかた」を開いたときに描く(Meta.render)
 

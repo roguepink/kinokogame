@@ -4,7 +4,7 @@
 
 const Meta = (() => {
   const KEY = 'kinoko_meta_v1';
-  const fresh = () => ({ codex: {}, ach: {}, pts: 0, charms: { owned: {}, eq: null }, outfit: { shirt: 0, hat: 0 }, daily: {}, loopUnlocked: false, loop: false, games: 0, best: 0, total: 0, firstDate: null });
+  const fresh = () => ({ codex: {}, ach: {}, pts: 0, charms: { owned: {}, eq: null }, outfit: { shirt: 0, hat: 0 }, daily: {}, loopUnlocked: false, loop: false, games: 0, best: 0, total: 0, firstDate: null, stage2: false, stage: 1 });
   let D = fresh();
   function load() { try { const raw = localStorage.getItem(KEY); if (raw) D = Object.assign(fresh(), JSON.parse(raw)); } catch (e) { D = fresh(); } }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* 保存できなくても遊べる */ } }
@@ -26,6 +26,14 @@ const Meta = (() => {
     { id: 'w_missile', name: 'ゆうどうミサイル', icon: 'crate', desc: 'てきを 自動で おいかけて はじける。' },
     { id: 'w_omni', name: 'オムニショット', icon: 'crate', desc: '四方八方に いっせいに うつ。' },
     { id: 'w_rainbow', name: '虹の水てっぽう', icon: 'crate', desc: '当てた どうぶつが ずっと なかまに。' },
+    { id: 'thief', name: 'どろぼう', icon: 'thief', desc: 'まち: すばやく とっしんして スコアを ぬすむ。' },
+    { id: 'zombie', name: 'ゾンビ', icon: 'zombie', desc: 'まち: のろいけど タフ。つかまれると いたい。' },
+    { id: 'yankee', name: 'リーゼントの ヤンキー', icon: 'yankee', desc: 'まち: とっしんして けとばす。' },
+    { id: 'bossy', name: 'リーゼント総長', icon: 'bossy', desc: 'まちの ボス。くしで 髪を とかす ときが チャンス。' },
+    { id: 'police', name: 'けいさつかん', icon: 'police', desc: 'まち: さわると スピードアップ。なかまに なってくれる。' },
+    { id: 'w_rifle', name: 'ライフル', icon: 'crate', desc: 'まち: 遠くまで つらぬく。' },
+    { id: 'w_shotgun', name: 'ショットガン', icon: 'crate', desc: 'まち: 近くで ひろく 当たる。' },
+    { id: 'w_drone', name: 'こうげきドローン', icon: 'crate', desc: 'まち: 3台が 自動で うつ。' },
   ];
   function codexSee(id) { const c = D.codex[id] || (D.codex[id] = { seen: 0, killed: 0 }); c.seen += 1; if (c.seen === 1) { save(); if (typeof UI !== 'undefined' && G.state === 'playing') UI.toast('ずかんに とうろく: ' + (CODEX.find((x) => x.id === id) || { name: id }).name, 2200); } }
   function codexKill(id) { const c = D.codex[id] || (D.codex[id] = { seen: 0, killed: 0 }); c.killed += 1; if (c.seen === 0) c.seen = 1; }
@@ -51,6 +59,8 @@ const Meta = (() => {
     { id: 'boost20', name: 'どうぶつの ともだち', desc: 'うさぎ・リスに ぜんぶで 20回', test: () => (D.boosts || 0) >= 20 },
     { id: 'weapons', name: '武器マスター', desc: '4しゅるいの 武器を ぜんぶ 使う', test: () => ['w_boomerang', 'w_missile', 'w_omni', 'w_rainbow'].every((k) => D.codex[k] && D.codex[k].seen > 0) },
     { id: 'allies3', name: 'どうぶつ たいちょう', desc: '1ゲームで 3匹を なかまに する', test: (s) => (s.allies || 0) >= 3 },
+    { id: 'town', name: 'まちの ヒーロー', desc: 'ステージ2「まち」で ランクA', test: (s, score, rank) => G.stage === 2 && (rank === 'A' || rank === 'S') },
+    { id: 'townboss', name: '総長を たおした', desc: 'リーゼント総長を たいじ', test: (s) => G.stage === 2 && s.boss >= 1 },
     { id: 'rainbow', name: 'にじいろの きずな', desc: '虹の水てっぽうで なかまに した どうぶつが 敵を たおす', test: (s) => (s.allyKills || 0) >= 1 },
     { id: 'night', name: 'よるの ハンター', desc: '夜に 金色のキノコを たおす', test: (s) => s.nightGold >= 1 },
     { id: 's12k', name: 'もりの でんせつ', desc: 'スコア 12000', test: (s, score) => score >= 12000 },
@@ -149,10 +159,12 @@ const Meta = (() => {
     const dailyStar = !wasStar && rec.best >= dy.def.target;
     let loopNew = false;
     if (!D.loopUnlocked && (rank === 'A' || rank === 'S')) { D.loopUnlocked = true; loopNew = true; }
+    let stage2New = false;
+    if (!D.stage2 && G.stage === 1 && (rank === 'B' || rank === 'A' || rank === 'S')) { D.stage2 = true; stage2New = true; }
     // 古い日のきろくは消す
     for (const k of Object.keys(D.daily)) if (k !== todayKey() && Object.keys(D.daily).length > 7) delete D.daily[k];
     save();
-    return { gained, pts: D.pts, newAch, daily: { ...dy, val, star: rec.best >= dy.def.target, newStar: dailyStar }, loopNew };
+    return { gained, pts: D.pts, newAch, daily: { ...dy, val, star: rec.best >= dy.def.target, newStar: dailyStar }, loopNew, stage2New };
   }
 
   // ---------- 画面(タイトルから開くパネル) ----------
@@ -211,5 +223,5 @@ const Meta = (() => {
     if (pv) { const g = pv.getContext('2d'); g.clearRect(0, 0, 140, 140); g.save(); g.translate(70, 126); g.scale(2.6, 2.6); Art.drawBoy(g, { aim: 0.4, walkT: 0, moving: false, recoil: 0, hurtT: 0, slowT: 0, firing: false, vx: 0, vy: 0, lean: 0, outfit: outfit() }, 0.5); g.restore(); }
   }
 
-  return { D, CODEX, ACH, SHIRTS, HATS, CHARMS, codexSee, codexKill, codexCount, achCount, rainbowUnlocked, outfit, charm, buyCharm, equipCharm, daily, applyStart, onGameEnd, openPanel, save, setLoop: (v) => { D.loop = !!v; save(); }, loopUnlocked: () => D.loopUnlocked, loopOn: () => !!(D.loop && D.loopUnlocked), pts: () => D.pts };
+  return { D, CODEX, ACH, SHIRTS, HATS, CHARMS, codexSee, codexKill, codexCount, achCount, rainbowUnlocked, outfit, charm, buyCharm, equipCharm, daily, applyStart, onGameEnd, openPanel, save, setLoop: (v) => { D.loop = !!v; save(); }, loopUnlocked: () => D.loopUnlocked, loopOn: () => !!(D.loop && D.loopUnlocked), pts: () => D.pts, stage2Unlocked: () => !!D.stage2, stage: () => (D.stage === 2 && D.stage2 ? 2 : 1), setStage: (n) => { D.stage = n; save(); } };
 })();

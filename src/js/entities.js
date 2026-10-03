@@ -21,6 +21,20 @@ function moveBody(e, dx, dy, r, noObs) {
   let hit = null;
   if (!noObs) {
     W.hash.query(e.x - r - 6, e.y - r - 6, e.x + r + 6, e.y + r + 6, (o) => {
+      if (o.rect) { // 長方形: いちばん近い面へ押し出す
+        const px = clamp(e.x, o.x - o.hw2, o.x + o.hw2);
+        const py = clamp(e.y, o.y - o.hh2, o.y + o.hh2);
+        let ddx = e.x - px; let ddy = e.y - py;
+        const d2 = ddx * ddx + ddy * ddy;
+        if (d2 >= r * r) return;
+        if (d2 < 0.0001) { // 中に入ってしまった: 近い面へ
+          const l = e.x - (o.x - o.hw2); const rr2 = (o.x + o.hw2) - e.x; const t = e.y - (o.y - o.hh2); const bt = (o.y + o.hh2) - e.y;
+          const m = Math.min(l, rr2, t, bt);
+          if (m === l) e.x = o.x - o.hw2 - r; else if (m === rr2) e.x = o.x + o.hw2 + r; else if (m === t) e.y = o.y - o.hh2 - r; else e.y = o.y + o.hh2 + r;
+        } else { const d = Math.sqrt(d2); const k = (r - d) / d; e.x += ddx * k; e.y += ddy * k; }
+        hit = o;
+        return;
+      }
       const ddx = e.x - o.x;
       const ddy = e.y - o.y;
       const min = r + o.r;
@@ -94,8 +108,10 @@ function makeMushroom(type, x, y, big) {
 function makeCritter(type) {
   return { kind: 'critter', type, x: 0, y: 0, face: 1, t: Math.random() * 9, hopU: 0, hopping: false, hopDur: 0.34, hopSpeed: 0, dx: 1, dy: 0, rest: rr(0.2, 1.5), bump: 0, gone: false, respawn: 0, fear: false, y0: 0 };
 }
+const enemyDefs = () => (G.stage === 2 ? Town.ENEMIES : CONFIG.enemies);
 function makeEnemy(type, x, y) {
-  const def = CONFIG.enemies[type];
+  let def = enemyDefs()[type];
+  if (G.stage === 2) def = Object.assign({}, def, { hp: Math.round(def.hp * CONFIG.stage2.hpMul), chase: def.chase * CONFIG.stage2.speedMul });
   return {
     kind: 'enemy', type, def, x, y, hp: def.hp, maxHp: def.hp, state: 'wander', st: 0, t: Math.random() * 9,
     face: Math.random() < 0.5 ? 1 : -1, homeX: x, homeY: y, tx: x, ty: y, wanderT: 0, idle: rr(0.3, 2), avoidT: 0, avoidSide: 1,
@@ -186,9 +202,10 @@ function placeCritter(c, minDist) {
   c.gone = false; c.hopping = false; c.hopU = 0; c.rest = rr(0.3, 1.5);
 }
 function pickEnemyType() {
-  const cnt = { boar: 0, bear: 0, gorilla: 0 };
-  for (const e of G.enemies) cnt[e.type]++;
-  const order = ['gorilla', 'bear', 'boar'];
+  const cnt = {};
+  const order = Object.keys(enemyDefs());
+  for (const k of order) cnt[k] = 0;
+  for (const e of G.enemies) if (cnt[e.type] !== undefined) cnt[e.type]++;
   order.sort((a, b) => cnt[a] - cnt[b] || Math.random() - 0.5);
   return order[0];
 }
@@ -231,13 +248,16 @@ function resetGame() {
   while (G.mushrooms.filter((m) => m.type === 'poison').length < CONFIG.mushroom.poisonTarget && guard++ < 40) spawnPoisonCluster();
   guard = 0;
   while (G.mushrooms.length - G.mushrooms.filter((m) => m.type === 'poison').length < CONFIG.mushroom.goodTarget && guard++ < 80) spawnGoodMushroom();
-  for (let i = 0; i < CONFIG.critter.count; i++) { const c = makeCritter('rabbit'); placeCritter(c, 300); G.critters.push(c); }
-  for (let i = 0; i < CONFIG.critter.count; i++) { const c = makeCritter('squirrel'); placeCritter(c, 300); G.critters.push(c); }
+  if (G.stage === 2) { for (let i = 0; i < CONFIG.critter.count * 2 - 2; i++) { const c = makeCritter('police'); placeCritter(c, 300); G.critters.push(c); } }
+  else {
+    for (let i = 0; i < CONFIG.critter.count; i++) { const c = makeCritter('rabbit'); placeCritter(c, 300); G.critters.push(c); }
+    for (let i = 0; i < CONFIG.critter.count; i++) { const c = makeCritter('squirrel'); placeCritter(c, 300); G.critters.push(c); }
+  }
   // スタート近くにうさぎを1匹
   const near = G.critters[0];
   const sp = G.world.randomSpot(Math.random, (x, y) => Math.hypot(x - G.player.x, y - G.player.y) < 260 && Math.hypot(x - G.player.x, y - G.player.y) > 140);
   if (sp) { near.x = sp.x; near.y = sp.y; }
-  for (let i = 0; i < CONFIG.director.start; i++) spawnEnemy(true);
+  for (let i = 0; i < (G.stage === 2 ? CONFIG.stage2.director : CONFIG.director).start; i++) spawnEnemy(true);
   Features.reset();
   Meta.applyStart();
   if (G.loop) { for (const e of G.enemies) loopify(e); UI.toast('2周目の森: てきが つよい・金色が よく出る・スコア 1.5倍', 3600); }
@@ -441,6 +461,7 @@ function updateProjectiles(dt) {
       W.hash.query(p.x - 4, p.y - 4, p.x + 4, p.y + 4, (o) => {
         if (dead) return;
         if (LOW_KINDS[o.kind] || o.low) return;
+        if (o.rect) { if (Math.abs(p.x - o.x) < o.hw2 + 2 && Math.abs(p.y - o.y) < o.hh2 + 2) { dead = true; hitKind = 'wall'; } return; }
         if (Math.hypot(o.x - p.x, o.y - p.y) < o.r + 2) { dead = true; hitKind = 'wall'; }
       });
     }
@@ -553,7 +574,8 @@ function hitEnemy(e, p) {
   e.hp -= p.dmg || 1;
   e.flash = 0.12;
   e.slow = 0.5;
-  e.kx += p.vx * 0.045; e.ky += p.vy * 0.045;
+  const kb = p.kb ? 0.16 : 0.045;
+  e.kx += p.vx * kb; e.ky += p.vy * kb;
   burst(p.x, p.y - 12, 7, { dir: Math.atan2(p.vy, p.vx), spread: 2.2, s0: 50, s1: 140, l0: 0.25, l1: 0.45, z0: 1.8, z1: 3.6, color: p.gold ? ['#ffe14d', '#fff'] : ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 260 });
   addDecal(e.x + rr(-14, 14), e.y + rr(-4, 8), 0.5, p.gold ? 'gsplat' : 'splat', 10);
   G.cam.shake = Math.max(G.cam.shake, 1.8);
@@ -613,7 +635,8 @@ function noticePlayer(e) {
   if (G.alertCd <= 0) { Sound.sfx.alert(); G.alertCd = 1.2; }
   if (!G.shownHints[e.type]) {
     G.shownHints[e.type] = true;
-    UI.toast(e.def.name + 'が おってくる! ' + (e.type === 'boar' ? 'とっしんに ちゅうい' : e.type === 'bear' ? 'つめに ちゅうい' : 'ジャンプに ちゅうい'));
+    const atk = e.def.atk || (e.type === 'boar' ? 'charge' : e.type === 'bear' ? 'swipe' : 'leap');
+    UI.toast(e.def.name + 'が おってくる! ' + (atk === 'charge' ? 'とっしんに ちゅうい' : atk === 'swipe' ? 'ひっかきに ちゅうい' : 'ジャンプに ちゅうい'));
   }
 }
 
@@ -705,9 +728,10 @@ function updateEnemy(e, dt) {
       if (!alive || e.loseT > 1.6 || e.stuckT > 3) { e.state = 'wander'; e.st = 0; e.homeX = e.x; e.homeY = e.y; e.idle = 1; e.stuckT = 0; e.cool = 1.5; break; }
       steer(e, dx, dy, def.chase * diff * slowMul, dt);
       if (e.cool <= 0) {
-        if (e.type === 'boar' && d < 300 && d > 70) startWindup(e, 'charge');
-        else if (e.type === 'bear' && d < def.reach - 8) startWindup(e, 'swipe');
-        else if (e.type === 'gorilla') {
+        const atk = def.atk || (e.type === 'boar' ? 'charge' : e.type === 'bear' ? 'swipe' : 'leap');
+        if (atk === 'charge' && d < 300 && d > 70) startWindup(e, 'charge');
+        else if (atk === 'swipe' && d < def.reach - 8) startWindup(e, 'swipe');
+        else if (atk === 'leap') {
           if (d < 72) startWindup(e, 'punch');
           else if (d > 130 && d < 340) startWindup(e, 'leap');
         }
@@ -726,7 +750,7 @@ function updateEnemy(e, dt) {
         const r = moveBody(e, e.cvx * dt, e.cvy * dt, def.cr);
         e.moving = true;
         if (Math.random() < dt * 40) addParticle({ x: e.x - e.cvx * 0.05, y: e.y - 2, vx: rr(-20, 20), vy: rr(-30, -5), ay: 0, drag: 0, life: 0.45, max: 0.45, size: rr(6, 11), grow: 14, color: 'rgba(210,190,150,0.7)', shape: 'dust', rot: 0, vr: 0 });
-        if (!e.hitDone && d < def.cr + P.r + 8) { e.hitDone = true; if (hurtPlayer(def.damage, e.x, e.y, 360)) { toRecover(e, 0.8); break; } }
+        if (!e.hitDone && d < def.cr + P.r + 8) { e.hitDone = true; if (hurtPlayer(def.damage, e.x, e.y, 360)) { if (def.steal && G.score > 0) { const st = Math.min(G.score, def.steal); G.score -= st; floatText(e.x, e.y - 90, '-' + st + ' ぬすまれた!', '#ffb347', 22); } toRecover(e, 0.8); break; } }
         if (r.hit || r.water) { stunEnemy(e, 1.4); break; }
         if (e.st >= e.dur) toRecover(e, 0.7);
       } else if (e.atk === 'swipe' || e.atk === 'punch') {
@@ -802,7 +826,7 @@ function separateEnemies() {
 
 // ---------- うさぎ・リス ----------
 function startHop(c, d, dx, dy) {
-  const speed = CONFIG.critter[c.type];
+  const speed = CONFIG.critter[c.type] || 160;
   c.hopping = true; c.hopU = 0.001;
   if (d < CONFIG.critter.fleeRadius) {
     c.fear = true;
@@ -991,7 +1015,7 @@ function updateParticles(dt) {
 }
 
 function updateDirector(dt) {
-  const D = CONFIG.director;
+  const D = G.stage === 2 ? CONFIG.stage2.director : CONFIG.director;
   const target = Math.min(D.max, D.start + Math.floor(G.t / D.every));
   const hostile = G.enemies.filter((e) => e.state !== 'ally').length;
   if (hostile < target) {

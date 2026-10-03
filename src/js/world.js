@@ -5,7 +5,8 @@ const T_LAND = 0;
 const T_WATER = 1;
 const T_BRIDGE = 2;
 
-function buildWorld(seed) {
+function buildWorld(seed, stage) {
+  const forest = stage !== 2;
   const rng = mulberry32(seed);
   const R = (a, b) => a + rng() * (b - a);
   const S = CONFIG.world.size;
@@ -37,6 +38,7 @@ function buildWorld(seed) {
     });
   };
 
+  if (forest) {
   // ---- 川 ----
   const riverDefs = [
     { w: 120, bridges: [0.17, 0.36, 0.62, 0.84],
@@ -82,6 +84,7 @@ function buildWorld(seed) {
         if (pointInRotRect((tx + 0.5) * TS, (ty + 0.5) * TS, br.x, br.y, br.ang, br.hl, br.hw)) tiles[ty * N + tx] = T_BRIDGE;
       });
     }
+  }
   }
   W.clear.push({ x: W.start.x, y: W.start.y, r: 240 });
 
@@ -150,6 +153,7 @@ function buildWorld(seed) {
     return push(o);
   };
 
+  if (forest) {
   // 山: 1つの山は横に並べた小さな円の連なりを当たり判定にする(見下ろしで平たく見えるため)
   const addMountain = (x, y, hw, v) => {
     if (waterNear(x, y, hw * 0.9)) return;
@@ -169,6 +173,7 @@ function buildWorld(seed) {
     }
   }
 
+  }
   // 丸太: 中心(cx,cy)に描き、当たり判定は両端の小さな円2つ
   const addLog = (cx, cy, ang, v, sc) => {
     const dx = Math.cos(ang) * 16 * sc;
@@ -177,6 +182,7 @@ function buildWorld(seed) {
     push({ kind: 'col', x: cx + dx, y: cy + dy, r: 9, low: true });
   };
 
+  if (forest) {
   // キャンプ(テント+たき火+丸太のイス)
   const campSpots = [[1250, 2480], [3000, 1700], [700, 760]];
   for (const [cx, cy] of campSpots) {
@@ -197,6 +203,7 @@ function buildWorld(seed) {
     }
   }
 
+  }
   // 木: まず森の塊(グローブ)、次に点在する木、最後にマップ外周の木の壁
   // 地域で木の種類が変わる: 川や池のそばは柳、山ぎわは針葉樹、それ以外は広葉樹
   const nearWaterFor = (x, y, d) => waterNear(x, y, d);
@@ -230,6 +237,7 @@ function buildWorld(seed) {
     }
     return big;
   };
+  if (forest) {
   for (let g = 0; g < 30; g++) addGrove(R(250, S - 250), R(250, S - 250), R(150, 330), Math.floor(R(12, 28)));
   for (let i = 0; i < 700; i++) addTree(R(100, S - 100), R(100, S - 100), R(0.7, 1.05), 40, 30);
   // 川沿いの柳と葦
@@ -265,9 +273,11 @@ function buildWorld(seed) {
     if (waterNear(x, y, 60) || inClear(x, y, 40) || tooClose(x, y, 40, 6)) continue;
     addLog(x, y, ang, Math.floor(R(0, 2)), 1.1);
   }
+  }
 
   // ---- 土の小道(見た目だけ。歩きやすさは変わらない) ----
   W.paths = [];
+  if (forest) {
   const trailDefs = [
     [[W.start.x, W.start.y], [1250, 2480], [1550, 2300], [1850, 2450]],
     [[700, 760], [1050, 900], [1500, 1150], [1900, 1500]],
@@ -280,12 +290,14 @@ function buildWorld(seed) {
     W.paths.push({ path, w: R(26, 40) });
   }
 
+  }
   // ---- 飾り(当たり判定なし): 草の房・花・小石・葦 ----
   const addDecor = (kind, x, y, v, extra) => {
     const d = Object.assign({ kind, x, y, v }, extra || {});
     W.decor.insert(d, 4);
     return d;
   };
+  if (forest) {
   for (let i = 0; i < 3200; i++) {
     const x = R(40, S - 40);
     const y = R(40, S - 40);
@@ -363,7 +375,9 @@ function buildWorld(seed) {
     }
   }
 
+  }
   // ---- 草むら(背の高い草。キノコが隠れる) ----
+  if (forest) {
   for (let tries = 0; tries < 400 && W.patches.length < 72; tries++) {
     const r = R(55, 105);
     const x = R(150, S - 150);
@@ -380,6 +394,9 @@ function buildWorld(seed) {
     blades.sort((p, q) => p.dy - q.dy);
     W.patches.push({ x, y, r, blades });
   }
+  }
+  // ---- まち(ステージ2) ----
+  if (!forest) Town.populate(W, { rng, R, push, place, addDecor, addTree, forTiles, markCircle, tooClose, inClear, waterNear, S, TS, N, tiles });
   W.patchAt = (x, y) => {
     for (const p of W.patches) {
       const dx = x - p.x;
@@ -398,6 +415,10 @@ function buildWorld(seed) {
     }
   }
   for (const o of W.obstacles) {
+    if (o.rect) {
+      forTiles(o.x - o.hw2 - 12, o.y - o.hh2 - 12, o.x + o.hw2 + 12, o.y + o.hh2 + 12, (tx, ty) => { blocked[ty * N + tx] = 1; });
+      continue;
+    }
     if (o.r > 0) {
       const rr = o.r + 12;
       forTiles(o.x - rr, o.y - rr, o.x + rr, o.y + rr, (tx, ty) => {
@@ -408,6 +429,20 @@ function buildWorld(seed) {
     }
   }
   W.blocked = blocked;
+  // スタート地点がふさがっていたら、いちばん近い歩ける場所へずらす
+  {
+    let sx = Math.floor(W.start.x / TS); let sy = Math.floor(W.start.y / TS);
+    if (blocked[sy * N + sx]) {
+      let best = null; let bd = 1e9;
+      for (let ty = Math.max(3, sy - 25); ty < Math.min(N - 3, sy + 25); ty++) for (let tx = Math.max(3, sx - 25); tx < Math.min(N - 3, sx + 25); tx++) {
+        if (blocked[ty * N + tx]) continue;
+        // まわり1マスも空いている場所
+        if (blocked[ty * N + tx - 1] || blocked[ty * N + tx + 1] || blocked[(ty - 1) * N + tx] || blocked[(ty + 1) * N + tx]) continue;
+        const d = Math.hypot(tx - sx, ty - sy); if (d < bd) { bd = d; best = [tx, ty]; }
+      }
+      if (best) { W.start.x = (best[0] + 0.5) * TS; W.start.y = (best[1] + 0.5) * TS; }
+    }
+  }
   W.reach = floodFill(blocked, N, N, Math.floor(W.start.x / TS), Math.floor(W.start.y / TS));
   const spots = [];
   for (let i = 0; i < N * N; i++) if (W.reach[i]) spots.push(i);

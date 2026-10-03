@@ -11,6 +11,10 @@ const Features = (() => {
       missile:   { name: 'ゆうどうミサイル', color: '#ff6a3d', time: 18, rate: 4, speed: 260, accel: 900, turn: 7, seek: 520, dmg: 2, life: 2.2, tip: 'てきや どくキノコを 自動で おいかける。当たると はじける' },
       omni:      { name: 'オムニショット', color: '#9be0ff', time: 15, rate: 3.2, n: 12, range: 300, tip: '四方八方に いっせいに うつ。かこまれても だいじょうぶ' },
       rainbow:   { name: '虹の水てっぽう', color: '#ff8ad0', time: 16, rate: 8, tip: '当てた どうぶつが なかまに なって、さいごまで いっしょに たたかう' },
+      // ステージ2(まち)
+      rifle:     { name: 'ライフル', color: '#8fd8ff', time: 18, rate: 2.2, speed: 1300, range: 900, dmg: 4, hr: 6, tip: '遠くまで まっすぐ つらぬく。1発が つよい' },
+      shotgun:   { name: 'ショットガン', color: '#ffb347', time: 18, rate: 1.6, n: 7, arc: 0.6, speed: 760, range: 230, dmg: 1, tip: '近くで ひろく いっぱい 当たる。ふっとばす' },
+      drone:     { name: 'こうげきドローン', color: '#9fd3ec', time: 25, n: 3, life: 25, rate: 2.2, seek: 340, speed: 620, tip: '3台の ドローンが まわりを とんで、てきや どくキノコを 自動で うつ' },
     },
     boss: { at: 62, hp: 46, cr: 48, hr: 72, speed: 42, weakEvery: 7, weakTime: 2.6, weakMul: 3, sporeEvery: 4.5, spores: 5, cloudEvery: 10, cloudR: 170, cloudTime: 3.2, score: 3000 },
     mission: { bonusTime: 12, bonusScore: 300 },
@@ -28,7 +32,7 @@ const Features = (() => {
     G.missions = { cur: null, done: 0, list: [], flash: 0 };
     G.companions = 0;
     G.weapon = null; G.weaponT = 0; G.charge = 0; G.wasFiring = false;
-    G.booms = []; G.boomLv = 1; G.omniPh = 0; G.lastCrate = null;
+    G.booms = []; G.boomLv = 1; G.omniPh = 0; G.lastCrate = null; G.drones = [];
     G.night = 0; G.eve = 0;
     G.stats.outbreaks = 0; G.stats.outbreaksCleared = 0; G.stats.missions = 0; G.stats.boss = 0; G.stats.crates = 0;
     nextMission();
@@ -117,7 +121,7 @@ const Features = (() => {
     const P = G.player;
     const s = G.world.randomSpot(Math.random, (x, y) => { const d = Math.hypot(x - P.x, y - P.y); return d > 280 && d < 700; }, 30);
     if (!s) return false;
-    const keys = ['boomerang', 'missile', 'omni', 'rainbow'];
+    const keys = G.stage === 2 ? ['rifle', 'shotgun', 'missile', 'drone'] : ['boomerang', 'missile', 'omni', 'rainbow'];
     // 同じ武器が続かないように
     let w = keys[Math.floor(Math.random() * keys.length)];
     if (w === G.lastCrate && Math.random() < 0.7) w = keys[(keys.indexOf(w) + 1 + Math.floor(Math.random() * 3)) % keys.length];
@@ -142,10 +146,23 @@ const Features = (() => {
       if (G.weaponT <= 0) { G.weapon = null; UI.toast('ふつうの みずでっぽうに もどった'); }
     }
     updateBoomerangs(dt);
+    updateDrones(dt);
   }
   function pickCrate(c) {
     const w = C.weapons[c.w];
     const same = G.weapon === c.w;
+    if (c.w === 'drone') {
+      // ドローンは 武器を変えずに 3台 放つ
+      const P = G.player;
+      for (let i = 0; i < w.n; i++) { if (G.drones.length >= w.n) G.drones.shift(); G.drones.push({ x: P.x, y: P.y, ph: (i / w.n) * TAU, life: w.life + (G.charmWeaponTime || 0), cd: i * 0.2, t: 0 }); }
+      G.stats.crates += 1;
+      if (typeof Meta !== 'undefined') Meta.codexSee('w_drone');
+      floatText(c.x, c.y - 40, 'ドローン 3台 はっしん!', w.color, 24);
+      UI.toast(w.name + '! ' + w.tip, 3600);
+      burst(c.x, c.y - 16, 20, { s0: 50, s1: 170, l0: 0.4, l1: 0.9, z0: 3, z1: 6, color: [w.color, '#fff'], shape: 'spark' });
+      Sound.sfx.pickup();
+      return;
+    }
     G.weapon = c.w; G.weaponT = (same ? G.weaponT : 0) + w.time + (G.charmWeaponTime || 0);
     G.stats.crates += 1;
     if (typeof Meta !== 'undefined') Meta.codexSee('w_' + c.w);
@@ -205,6 +222,27 @@ const Features = (() => {
         Sound.sfx.shoot(true);
         return true;
       }
+      case 'rifle': {
+        const a = aim + (Math.random() - 0.5) * 0.02;
+        G.proj.push({ x: P.x + Math.cos(a) * 30, y: P.y + Math.sin(a) * 30, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: w.range / w.speed, dropT: 0, h: 22, dmg: w.dmg + (power ? 2 : 0), gold: power, homing: false, t: 0, pierce: true, hit: new Set(), hr: w.hr, rifle: true });
+        muzzle(P, a, '#fff', 22);
+        P.recoil = 1.6; P.fireCd = 1 / (power ? w.rate * 1.6 : w.rate);
+        G.cam.kx -= Math.cos(a) * 14; G.cam.ky -= Math.sin(a) * 14; G.cam.shake = Math.max(G.cam.shake, 3);
+        Sound.sfx.rifle();
+        return true;
+      }
+      case 'shotgun': {
+        for (let i = 0; i < w.n; i++) {
+          const a = aim + (i - (w.n - 1) / 2) * (w.arc / (w.n - 1)) + (Math.random() - 0.5) * 0.06;
+          const sp = w.speed * rr(0.85, 1.1);
+          G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / w.speed * rr(0.8, 1.1), dropT: 0, h: 22, dmg: w.dmg + (power ? 1 : 0), gold: power, homing: false, t: 0, small: true, kb: 1 });
+        }
+        muzzle(P, aim, '#ffd0a0', 24);
+        P.recoil = 2; P.fireCd = 1 / (power ? w.rate * 1.6 : w.rate);
+        G.cam.kx -= Math.cos(aim) * 18; G.cam.ky -= Math.sin(aim) * 18; G.cam.shake = Math.max(G.cam.shake, 5);
+        Sound.sfx.shotgun();
+        return true;
+      }
       case 'rainbow': {
         const a = aim + (Math.random() - 0.5) * 0.08;
         const sp = CONFIG.gun.speed;
@@ -216,6 +254,35 @@ const Features = (() => {
       }
       default: return false;
     }
+  }
+
+  // --- こうげきドローン: プレイヤーのまわりをまわり、近くの敵・毒キノコを自動でうつ ---
+  function updateDrones(dt) {
+    if (!G.drones || !G.drones.length) return;
+    const w = C.weapons.drone;
+    const P = G.player;
+    const keep = [];
+    for (const d of G.drones) {
+      d.t += dt; d.life -= dt; d.cd -= dt;
+      if (d.life <= 0) { burst(d.x, d.y - 40, 8, { s0: 30, s1: 90, l0: 0.3, l1: 0.6, z0: 2, z1: 4, color: ['#9fd3ec', '#fff'], shape: 'spark' }); continue; }
+      d.ph += dt * 1.6;
+      const tx = P.x + Math.cos(d.ph) * 80; const ty = P.y + Math.sin(d.ph) * 50;
+      d.x += (tx - d.x) * Math.min(1, dt * 5); d.y += (ty - d.y) * Math.min(1, dt * 5);
+      if (d.cd <= 0) {
+        let tgt = null; let bd = w.seek;
+        for (const m of G.mushrooms) { if (m.dead || m.type === 'good') continue; const dd = Math.hypot(m.x - d.x, m.y - d.y); if (dd < bd) { bd = dd; tgt = m; } }
+        for (const e of G.enemies) { if (e.state === 'flee' || e.state === 'ally') continue; const dd = Math.hypot(e.x - d.x, e.y - d.y); if (dd < bd) { bd = dd; tgt = e; } }
+        if (G.boss && !G.boss.dead) { const dd = Math.hypot(G.boss.x - d.x, G.boss.y - d.y); if (dd < bd) { bd = dd; tgt = G.boss; } }
+        if (tgt) {
+          d.cd = 1 / w.rate;
+          const a = Math.atan2(tgt.y - (tgt.kind === 'enemy' ? 10 : 0) - (d.y - 44), tgt.x - d.x);
+          G.proj.push({ x: d.x, y: d.y, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: 0.7, dropT: 0, h: 40, dmg: G.power > 0 ? 2 : 1, gold: G.power > 0, homing: true, turn: 5, seek: 200, t: 0, small: true });
+          addParticle({ x: d.x, y: d.y - 44, vx: 0, vy: 0, ay: 0, drag: 0, life: 0.06, max: 0.06, size: 8, color: '#ff6a3d', shape: 'flash', rot: a, vr: 0, grow: 0 });
+        }
+      }
+      keep.push(d);
+    }
+    G.drones = keep;
   }
 
   // --- ブーメラン(複数) ---
@@ -263,8 +330,9 @@ const Features = (() => {
     const b = { kind: 'boss', x: s.x, y: s.y, hp, maxHp: hp, t: 0, weakT: C.boss.weakEvery, weak: 0, sporeT: 2.5, cloudT: 6, cloud: 0, flash: 0, face: 1, wob: 0, hr: C.boss.hr, dead: false, intro: 2.2 };
     G.boss = b;
     if (G.ev) { for (const m of G.ev.mush) m.ev = null; G.ev = null; }
-    UI.banner('キノコおやかた!');
-    UI.toast('ボスが あらわれた! かさを もちあげた ときが チャンス!', 4200);
+    if (G.stage === 2) { b.hp = Math.round(Town.BOSS.hp * (G.loop ? 1.6 : 1)); b.maxHp = b.hp; b.hr = Town.BOSS.hr; }
+    UI.banner(G.stage === 2 ? 'リーゼント総長!' : 'キノコおやかた!');
+    UI.toast(G.stage === 2 ? 'ボスが あらわれた! 髪を くしで とかしている ときが チャンス!' : 'ボスが あらわれた! かさを もちあげた ときが チャンス!', 4200);
     Sound.sfx.bossRoar();
     G.cam.shake = Math.max(G.cam.shake, 12);
     return true;
@@ -342,7 +410,7 @@ const Features = (() => {
     G.score += pts; G.stats.boss = 1;
     Meta.codexKill('boss');
     floatText(B.x, B.y - 120, '+' + pts, '#ffe14d', 40);
-    UI.banner('おやかた たいじ!');
+    UI.banner(G.stage === 2 ? '総長 たいじ!' : 'おやかた たいじ!');
     ring(B.x, B.y, 30, 420, 1.1, 'rgba(255,230,120,0.95)', 12);
     burst(B.x, B.y - 60, 70, { s0: 80, s1: 360, l0: 0.7, l1: 1.6, z0: 3, z1: 9, color: ['#ffe14d', '#ff9ad0', '#9dffb0', '#fff', '#c35cff'], shape: 'spark', drag: 1.2 });
     burst(B.x, B.y - 60, 30, { s0: 60, s1: 260, l0: 0.5, l1: 1, z0: 4, z1: 9, color: ['#ff3d9a', '#c4126a'], shape: 'ink', ay: 420, drag: 1 });
@@ -361,9 +429,9 @@ const Features = (() => {
     { id: 'p8', text: 'どくキノコを 8本 きれいに', n: 8, get: () => G.stats.purified },
     { id: 'c5', text: '5コンボ する', n: 5, get: () => G.combo, peak: true },
     { id: 'c8', text: '8コンボ する', n: 8, get: () => G.combo, peak: true },
-    { id: 'e1', text: 'どうぶつを 1匹 おいはらう', n: 1, get: () => G.stats.inked },
-    { id: 'e2', text: 'どうぶつを 2匹 おいはらう', n: 2, get: () => G.stats.inked },
-    { id: 'b2', text: 'うさぎか リスに 2回 さわる', n: 2, get: () => G.stats.boosts },
+    { id: 'e1', text: () => (G.stage === 2 ? 'わるものを 1人 おいはらう' : 'どうぶつを 1匹 おいはらう'), n: 1, get: () => G.stats.inked },
+    { id: 'e2', text: () => (G.stage === 2 ? 'わるものを 2人 おいはらう' : 'どうぶつを 2匹 おいはらう'), n: 2, get: () => G.stats.inked },
+    { id: 'b2', text: () => (G.stage === 2 ? 'けいさつかんに 2回 さわる' : 'うさぎか リスに 2回 さわる'), n: 2, get: () => G.stats.boosts },
     { id: 'g1', text: 'ふつうのキノコを 1個 たべる', n: 1, get: () => G.stats.eaten },
     { id: 'w1', text: '武器の箱を 1つ ひろう', n: 1, get: () => G.stats.crates },
     { id: 'big', text: '大きな どくキノコを 1本 たおす', n: 1, get: () => G.stats.bigs || 0 },
