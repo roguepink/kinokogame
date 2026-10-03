@@ -366,7 +366,7 @@ function updatePlayer(dt) {
   const aimA = P.firing ? (a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim) : P.aim;
   if (!Features.weaponFire(P, aimA, dt) && P.firing && P.fireCd <= 0) {
     shoot(P, aimA);
-    P.fireCd = 1 / (G.power > 0 ? CONFIG.power.rate : CONFIG.gun.rate);
+    P.fireCd = 1 / (G.power > 0 ? CONFIG.power.rate : CONFIG.gun.rate * (G.stage === 2 ? 1.35 : 1));
   }
   // ブースト中のスピード線
   if (P.boostT > 0 && P.moving && Math.random() < dt * 40) {

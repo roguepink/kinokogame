@@ -7,14 +7,14 @@ const Features = (() => {
     outbreak: { first: 30, every: 48, limit: 42, r0: 70, r1: 250, count: 11, max: 22, addEvery: 5, bonus: 1200, taintSlow: 0.7, taintLife: 35 },
     crate: { first: 12, every: 22, max: 2 },
     weapons: {
-      boomerang: { name: 'ブーメラン', color: '#ffb347', time: 20, rate: 5, max: 6, speed: 540, out: 0.5, returnMax: 2.2, tip: 'おしっぱなしで 次々 投げる(6個まで)。キャッチすると 大きく(Lv3まで)' },
-      missile:   { name: 'ゆうどうミサイル', color: '#ff6a3d', time: 18, rate: 4, speed: 260, accel: 900, turn: 7, seek: 520, dmg: 2, life: 2.2, tip: 'てきや どくキノコを 自動で おいかける。当たると はじける' },
-      omni:      { name: 'オムニショット', color: '#9be0ff', time: 15, rate: 3.2, n: 12, range: 300, tip: '四方八方に いっせいに うつ。かこまれても だいじょうぶ' },
-      rainbow:   { name: '虹の水てっぽう', color: '#ff8ad0', time: 16, rate: 8, tip: '当てた どうぶつが なかまに なって、さいごまで いっしょに たたかう' },
+      boomerang: { name: 'ブーメラン', color: '#ffb347', time: 20, rate: 7, max: 8, speed: 540, out: 0.5, returnMax: 2.2, tip: 'おしっぱなしで 次々 投げる(6個まで)。キャッチすると 大きく(Lv3まで)' },
+      missile:   { name: 'ゆうどうミサイル', color: '#ff6a3d', time: 18, rate: 7, speed: 260, accel: 900, turn: 7, seek: 520, dmg: 2, life: 2.2, tip: 'てきや どくキノコを 自動で おいかける。当たると はじける' },
+      omni:      { name: 'オムニショット', color: '#9be0ff', time: 15, rate: 5, n: 12, range: 330, tip: '四方八方に いっせいに うつ。かこまれても だいじょうぶ' },
+      rainbow:   { name: '虹の水てっぽう', color: '#ff8ad0', time: 16, rate: 11, tip: '当てた どうぶつが なかまに なって、さいごまで いっしょに たたかう' },
       // ステージ2(まち)
-      rifle:     { name: 'ライフル', color: '#8fd8ff', time: 18, rate: 2.2, speed: 1300, range: 900, dmg: 4, hr: 6, tip: '遠くまで まっすぐ つらぬく。1発が つよい' },
-      shotgun:   { name: 'ショットガン', color: '#ffb347', time: 18, rate: 1.6, n: 7, arc: 0.6, speed: 760, range: 230, dmg: 1, tip: '近くで ひろく いっぱい 当たる。ふっとばす' },
-      drone:     { name: 'こうげきドローン', color: '#9fd3ec', time: 25, n: 3, life: 25, rate: 2.2, seek: 340, speed: 620, tip: '3台の ドローンが まわりを とんで、てきや どくキノコを 自動で うつ' },
+      rifle:     { name: 'ライフル', color: '#8fd8ff', time: 18, rate: 7, speed: 1300, range: 900, dmg: 3, hr: 6, tip: '連射で 遠くまで つらぬく' },
+      shotgun:   { name: 'ショットガン', color: '#ffb347', time: 18, rate: 4.5, n: 8, arc: 0.7, speed: 820, range: 360, dmg: 1, tip: '連射で ひろく ばらまく。ふっとばす' },
+      drone:     { name: 'こうげきドローン', color: '#9fd3ec', time: 25, n: 3, life: 25, rate: 4, seek: 380, speed: 700, tip: '3台の ドローンが まわりを とんで、てきや どくキノコを 自動で うつ' },
     },
     boss: { at: 62, hp: 46, cr: 48, hr: 72, speed: 42, weakEvery: 7, weakTime: 2.6, weakMul: 3, sporeEvery: 4.5, spores: 5, cloudEvery: 10, cloudR: 170, cloudTime: 3.2, score: 3000 },
     mission: { bonusTime: 12, bonusScore: 300 },
@@ -226,8 +226,8 @@ const Features = (() => {
         const a = aim + (Math.random() - 0.5) * 0.02;
         G.proj.push({ x: P.x + Math.cos(a) * 30, y: P.y + Math.sin(a) * 30, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: w.range / w.speed, dropT: 0, h: 22, dmg: w.dmg + (power ? 2 : 0), gold: power, homing: false, t: 0, pierce: true, hit: new Set(), hr: w.hr, rifle: true });
         muzzle(P, a, '#fff', 22);
-        P.recoil = 1.6; P.fireCd = 1 / (power ? w.rate * 1.6 : w.rate);
-        G.cam.kx -= Math.cos(a) * 14; G.cam.ky -= Math.sin(a) * 14; G.cam.shake = Math.max(G.cam.shake, 3);
+        P.recoil = 1.2; P.fireCd = 1 / (power ? w.rate * 1.6 : w.rate);
+        G.cam.kx -= Math.cos(a) * 7; G.cam.ky -= Math.sin(a) * 7; G.cam.shake = Math.max(G.cam.shake, 1.5);
         Sound.sfx.rifle();
         return true;
       }
@@ -235,11 +235,11 @@ const Features = (() => {
         for (let i = 0; i < w.n; i++) {
           const a = aim + (i - (w.n - 1) / 2) * (w.arc / (w.n - 1)) + (Math.random() - 0.5) * 0.06;
           const sp = w.speed * rr(0.85, 1.1);
-          G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / w.speed * rr(0.8, 1.1), dropT: 0, h: 22, dmg: w.dmg + (power ? 1 : 0), gold: power, homing: false, t: 0, small: true, kb: 1 });
+          G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / w.speed * rr(0.85, 1.15), dropT: 0, h: 22, dmg: w.dmg + (power ? 1 : 0), gold: power, homing: false, t: 0, pellet: true, kb: 1 });
         }
         muzzle(P, aim, '#ffd0a0', 24);
-        P.recoil = 2; P.fireCd = 1 / (power ? w.rate * 1.6 : w.rate);
-        G.cam.kx -= Math.cos(aim) * 18; G.cam.ky -= Math.sin(aim) * 18; G.cam.shake = Math.max(G.cam.shake, 5);
+        P.recoil = 1.4; P.fireCd = 1 / (power ? w.rate * 1.6 : w.rate);
+        G.cam.kx -= Math.cos(aim) * 9; G.cam.ky -= Math.sin(aim) * 9; G.cam.shake = Math.max(G.cam.shake, 3);
         Sound.sfx.shotgun();
         return true;
       }
@@ -531,13 +531,37 @@ const Features = (() => {
     Sound.sfx.eat();
   }
   function updateAlly(e, dt) {
-    let tgt = null; let bd = 700;
-    for (const o of G.enemies) { if (o === e || o.state === 'flee' || o.state === 'ally') continue; const d = Math.hypot(o.x - e.x, o.y - e.y); if (d < bd) { bd = d; tgt = o; } }
     const P = G.player;
+    e.allyCd = Math.max(0, (e.allyCd || 0) - dt);
+    // ねらう相手: 近くの敵 → ボス → 毒キノコ → いなければ主人公のそばへ
+    let tgt = null; let bd = 900; let kind = null;
+    // いま追っている相手は、たおすまで追いつづける
+    const cur = e.allyTgt;
+    if (cur && ((cur.kind === 'enemy' && cur.state !== 'flee' && cur.state !== 'ally') || (cur.kind === 'boss' && !cur.dead && G.boss === cur) || (cur.kind === 'mushroom' && !cur.dead)) && Math.hypot(cur.x - e.x, cur.y - e.y) < 1100) {
+      tgt = cur; kind = cur.kind === 'enemy' ? 'enemy' : cur.kind === 'boss' ? 'boss' : 'mush';
+    } else {
+      for (const o of G.enemies) { if (o === e || o.state === 'flee' || o.state === 'ally') continue; const d = Math.hypot(o.x - e.x, o.y - e.y); if (d < bd) { bd = d; tgt = o; kind = 'enemy'; } }
+      if (G.boss && !G.boss.dead && G.boss.intro <= 0) { const d = Math.hypot(G.boss.x - e.x, G.boss.y - e.y) * 0.6; if (d < bd) { bd = d; tgt = G.boss; kind = 'boss'; } }
+      if (!tgt) { bd = 500; for (const m of G.mushrooms) { if (m.dead || m.type !== 'poison') continue; const d = Math.hypot(m.x - e.x, m.y - e.y); if (d < bd) { bd = d; tgt = m; kind = 'mush'; } } }
+      e.allyTgt = tgt;
+    }
     const tx = tgt ? tgt.x : P.x - 60 * (P.face || 1); const ty = tgt ? tgt.y : P.y + 30;
     const dx = tx - e.x; const dy = ty - e.y; const d = Math.hypot(dx, dy);
-    if (d > 20) steer(e, dx, dy, e.def.chase * 1.1, dt);
-    if (tgt && d < e.def.cr + tgt.def.cr + 16) { defeatEnemy(tgt, true); G.stats.allyKills = (G.stats.allyKills || 0) + 1; e.kx -= dx / d * 200; e.ky -= dy / d * 200; }
+    const reach = tgt ? (kind === 'enemy' ? e.def.cr + tgt.def.cr + 22 : kind === 'boss' ? C.boss.cr + e.def.cr + 24 : tgt.hr + e.def.cr + 10) : 20;
+    if (d > reach * 0.85) steer(e, dx, dy, e.def.chase * 1.15, dt); else e.moving = false;
+    if (Math.abs(dx) > 4) e.face = dx > 0 ? 1 : -1;
+    if (tgt && d < reach && e.allyCd <= 0) {
+      // 殴る! (敵は3発くらいで撃退、ボスは少しずつ、毒キノコは1発)
+      e.allyCd = 0.7; e.flash = 0.1;
+      const hit = { x: tx, y: ty - 10, vx: dx * 6, vy: dy * 6, dmg: kind === 'boss' ? 2 : 3, gold: false };
+      burst(tx, ty - 20, 8, { dir: Math.atan2(dy, dx), spread: 1.6, s0: 50, s1: 150, l0: 0.25, l1: 0.45, z0: 2, z1: 4, color: ['#ff8ad0', '#fff', '#ffe14d'], shape: 'spark' });
+      floatText(tx, ty - 60, 'ポカッ!', '#ff8ad0', 18);
+      if (kind === 'enemy') { tgt.kx += dx / d * 180; tgt.ky += dy / d * 180; hitEnemy(tgt, hit); if (tgt.state === 'flee') { G.stats.allyKills = (G.stats.allyKills || 0) + 1; } }
+      else if (kind === 'boss') hitBoss(hit);
+      else hitMushroom(tgt, hit);
+      e.kx -= dx / d * 90; e.ky -= dy / d * 90;
+      Sound.sfx.hitEnemy();
+    }
     if (Math.random() < dt * 4) addParticle({ x: e.x + rr(-16, 16), y: e.y - rr(30, 70), vx: 0, vy: -20, ay: 0, drag: 0, life: 0.8, max: 0.8, size: 4, color: '#ff8ad0', shape: 'heart', rot: 0, vr: 0, grow: 0 });
   }
 
