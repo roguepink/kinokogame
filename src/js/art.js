@@ -641,7 +641,7 @@ const Art = (() => {
     g.save();
     const hx = clamp(side * 1.6, -1.6, 1.6) + (run ? Math.sign(P.vx || 0) * fast * 1.2 : 0);
     const headBob = run ? Math.sin(wt * 2) * 0.6 : 0;
-    g.translate(hx, -37.5 + headBob);
+    g.translate(hx, -38.5 + headBob);
     g.rotate(run ? -lean * 0.5 : 0);
     drawBoyHead(g, P, t, up, hurt, run ? Math.sin(wt * 2 + 1) * 1.6 * (0.5 + fast) : Math.sin(t * 2.2) * 0.4);
     g.restore();
@@ -654,71 +654,88 @@ const Art = (() => {
   function drawBoyHead(g, P, t, up, hurt, hb) {
     hb = hb || 0;
     const aim = P.aim;
-    const lx = clamp(Math.cos(aim) * 2.4, -2.4, 2.4);
-    const ly = clamp(Math.sin(aim) * 1.4, -1.2, 1.6);
+    const lx = clamp(Math.cos(aim) * 2.6, -2.6, 2.6);
+    const ly = clamp(Math.sin(aim) * 1.5, -1.3, 1.7);
+    const R = 15.5; // 大きめの頭(かわいく)
     if (up) {
-      circ(g, 0, 0, 13.2, '#6b3f2a', 2.4);
-      g.fillStyle = '#8a5a3c'; g.beginPath(); g.ellipse(-4, -6, 7, 4.4, -0.4, 0, TAU); g.fill();
-      g.fillStyle = '#4e2c1d'; g.beginPath(); g.ellipse(4, 6, 10, 6, 0, 0, TAU); g.fill();
+      circ(g, 0, 0, R, '#6b3f2a', 2.4);
+      g.fillStyle = '#8a5a3c'; g.beginPath(); g.ellipse(-5, -7, 8, 5, -0.4, 0, TAU); g.fill();
+      g.fillStyle = '#4e2c1d'; g.beginPath(); g.ellipse(4, 7, 11, 6.5, 0, 0, TAU); g.fill();
       g.strokeStyle = OUT; g.lineWidth = 2.4; g.lineCap = 'round';
-      g.beginPath(); g.moveTo(0, -13); g.quadraticCurveTo(-5, -22, 3, -23); g.stroke();
-      g.strokeStyle = '#6b3f2a'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -13); g.quadraticCurveTo(-5, -22, 3, -23); g.stroke();
+      g.beginPath(); g.moveTo(0, -R + 1); g.quadraticCurveTo(-5, -24, 3, -25.5); g.stroke();
+      g.strokeStyle = '#6b3f2a'; g.lineWidth = 1.2; g.stroke();
+      drawHat(g, P.outfit && P.outfit.hat, 0);
       return;
     }
-    // 耳
-    circ(g, -13, 1, 3.6, SKIN, 1.8); circ(g, 13, 1, 3.6, SKIN, 1.8);
-    circ(g, 0, 0, 13.2, SKIN, 2.4);
-    // ほっぺ
-    ell(g, -8.4 + lx * 0.5, 8 + ly * 0.3, 3.2, 2, 'rgba(255,120,130,0.5)', 0);
-    ell(g, 8.4 + lx * 0.5, 8 + ly * 0.3, 3.2, 2, 'rgba(255,120,130,0.5)', 0);
-    // 目
-    const blink = (t % 3.4) < 0.12;
+    // 耳・顔
+    circ(g, -R + 1, 2, 3.8, SKIN, 1.8); circ(g, R - 1, 2, 3.8, SKIN, 1.8);
+    g.beginPath(); g.ellipse(0, 0.5, R, R - 0.5, 0, 0, TAU); fillStroke(g, SKIN, 2.4);
+    // ほっぺ(ふんわり)
+    for (const sx of [-1, 1]) { const gr = g.createRadialGradient(sx * 9 + lx * 0.4, 7, 0.5, sx * 9 + lx * 0.4, 7, 4.6); gr.addColorStop(0, 'rgba(255,120,140,0.55)'); gr.addColorStop(1, 'rgba(255,120,140,0)'); g.fillStyle = gr; g.beginPath(); g.arc(sx * 9 + lx * 0.4, 7, 4.6, 0, TAU); g.fill(); }
+    // 目: 大きく、きらきら
+    const blink = (t % 3.6) < 0.11;
     const poisoned = P.slowT > 0;
     for (const sx of [-1, 1]) {
-      const ex = sx * 5.4 + lx * 0.7;
-      const ey = 3.8 + ly * 0.5;
+      const ex = sx * 5.8 + lx * 0.7;
+      const ey = 2.6 + ly * 0.5;
       if (hurt) {
-        g.strokeStyle = OUT; g.lineWidth = 2; g.lineCap = 'round';
-        g.beginPath(); g.moveTo(ex - sx * 3, ey - 3); g.lineTo(ex + sx * 2.4, ey); g.lineTo(ex - sx * 3, ey + 3); g.stroke();
+        g.strokeStyle = OUT; g.lineWidth = 2.2; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(ex - sx * 3.4, ey - 3.4); g.lineTo(ex + sx * 2.6, ey); g.lineTo(ex - sx * 3.4, ey + 3.4); g.stroke();
       } else if (blink) {
-        g.strokeStyle = OUT; g.lineWidth = 2; g.lineCap = 'round';
-        g.beginPath(); g.moveTo(ex - 3.4, ey + 1); g.lineTo(ex + 3.4, ey + 1); g.stroke();
+        g.strokeStyle = OUT; g.lineWidth = 2.2; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(ex - 4, ey + 1.5); g.quadraticCurveTo(ex, ey + 3.5, ex + 4, ey + 1.5); g.stroke();
       } else if (poisoned) {
-        circ(g, ex, ey, 4.4, '#fff', 1.8);
-        g.strokeStyle = OUT; g.lineWidth = 1.4; g.beginPath();
-        for (let a = 0; a < 9; a += 0.5) { const rr = a * 0.42; const px = ex + Math.cos(a + t * 6) * rr, py = ey + Math.sin(a + t * 6) * rr; a === 0 ? g.moveTo(px, py) : g.lineTo(px, py); }
+        ell(g, ex, ey, 4.8, 5.6, '#fff', 1.8);
+        g.strokeStyle = OUT; g.lineWidth = 1.5; g.beginPath();
+        for (let a = 0; a < 10; a += 0.5) { const rr2 = a * 0.44; const px = ex + Math.cos(a + t * 6) * rr2; const py = ey + Math.sin(a + t * 6) * rr2; a === 0 ? g.moveTo(px, py) : g.lineTo(px, py); }
         g.stroke();
       } else {
-        ell(g, ex, ey, 3.7, 4.7, '#fff', 1.7);
-        ell(g, ex + lx * 0.5, ey + 0.6 + ly * 0.6, 2.7, 3.5, '#4a6a3a', 0);
-        ell(g, ex + lx * 0.5, ey + 0.8 + ly * 0.6, 1.6, 2.4, '#1d1a2a', 0);
-        circ(g, ex + lx * 0.5 - 1, ey - 1, 1.3, '#fff', 0);
-        circ(g, ex + lx * 0.5 + 1, ey + 2.6, 0.7, '#fff', 0);
-        g.strokeStyle = OUT; g.lineWidth = 2; g.lineCap = 'round';
-        g.beginPath(); g.moveTo(ex - 4, ey - 4); g.quadraticCurveTo(ex, ey - 5.8, ex + 4, ey - 4.2); g.stroke();
+        ell(g, ex, ey, 4.7, 5.9, '#fff', 1.9);
+        const ix = ex + lx * 0.55; const iy = ey + 0.9 + ly * 0.6;
+        const ig = g.createLinearGradient(ix, iy - 4, ix, iy + 4); ig.addColorStop(0, '#5aa06a'); ig.addColorStop(1, '#2f6a44');
+        ell(g, ix, iy, 3.5, 4.6, ig, 0);
+        ell(g, ix, iy + 0.6, 2.1, 3.1, '#1d1a2a', 0);
+        circ(g, ix - 1.3, iy - 1.9, 1.6, '#fff', 0);
+        circ(g, ix + 1.3, iy + 2.2, 0.9, '#fff', 0);
+        circ(g, ix + 1.9, iy - 0.6, 0.5, '#fff', 0);
+        // まつげ(上まぶた)
+        g.strokeStyle = OUT; g.lineWidth = 2.2; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(ex - 4.8, ey - 4.6); g.quadraticCurveTo(ex, ey - 7.2, ex + 4.8, ey - 4.6); g.stroke();
+        g.lineWidth = 1.6; g.beginPath(); g.moveTo(ex + sx * 4.6, ey - 4.9); g.lineTo(ex + sx * 6.2, ey - 6.4); g.stroke();
       }
     }
-    // 口
+    // まゆ(やわらかく)
+    g.strokeStyle = 'rgba(80,50,30,0.8)'; g.lineWidth = 1.6; g.lineCap = 'round';
+    for (const sx of [-1, 1]) { const ex = sx * 5.8 + lx * 0.7; g.beginPath(); g.moveTo(ex - 3.2, -5.2 + ly * 0.3); g.quadraticCurveTo(ex, -6.6 + ly * 0.3, ex + 3.2, -5.4 + ly * 0.3); g.stroke(); }
+    // 口(小さく)
     g.strokeStyle = OUT; g.lineWidth = 1.7; g.lineCap = 'round';
-    if (hurt) { ell(g, lx * 0.6, 10, 2, 1.6, '#c0405a', 1.4); }
-    else if (P.firing) { ell(g, lx * 0.6, 10, 2.4, 2, '#c0405a', 1.6); }
-    else if (poisoned) { g.beginPath(); g.moveTo(-2.6 + lx * 0.6, 10.6); g.quadraticCurveTo(lx * 0.6, 8.8, 2.6 + lx * 0.6, 10.6); g.stroke(); }
-    else { g.beginPath(); g.arc(lx * 0.6, 8.6, 2.6, 0.25, Math.PI - 0.25); g.stroke(); }
-    if (poisoned) { g.fillStyle = 'rgba(120,220,60,0.32)'; g.beginPath(); g.arc(0, 0, 13, 0, TAU); g.fill(); }
-    // 髪
+    if (hurt) { ell(g, lx * 0.6, 10.5, 2.2, 1.8, '#c0405a', 1.4); }
+    else if (P.firing) { ell(g, lx * 0.6, 10.6, 2.4, 2.2, '#c0405a', 1.6); g.fillStyle = '#ff9aa8'; g.beginPath(); g.ellipse(lx * 0.6, 11.6, 1.4, 0.9, 0, 0, TAU); g.fill(); }
+    else if (poisoned) { g.beginPath(); g.moveTo(-2.8 + lx * 0.6, 11.4); g.quadraticCurveTo(lx * 0.6, 9.4, 2.8 + lx * 0.6, 11.4); g.stroke(); }
+    else { g.beginPath(); g.moveTo(-2.6 + lx * 0.6, 9.6); g.quadraticCurveTo(lx * 0.6, 12.2, 2.6 + lx * 0.6, 9.6); g.stroke(); }
+    if (poisoned) { g.fillStyle = 'rgba(120,220,60,0.32)'; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill(); }
+    // 髪: まるい前髪(ぱっつん風に ふんわり)
     g.save(); g.translate(0, -hb * 0.3); g.scale(1, 1 + hb * 0.025);
     g.beginPath();
-    g.moveTo(-13.6, 3);
-    g.bezierCurveTo(-16, -12, -8, -18, 0, -18);
-    g.bezierCurveTo(8, -18, 16, -12, 13.6, 3);
-    g.lineTo(11.6, -5); g.lineTo(8.8, -1.2); g.lineTo(5.6, -7.4); g.lineTo(2.2, -1.6); g.lineTo(-1.2, -8.6);
-    g.lineTo(-4.4, -1.4); g.lineTo(-7.6, -7.6); g.lineTo(-10.6, -1.4); g.lineTo(-12.4, -5); g.closePath();
-    fillStroke(g, '#6b3f2a', 2.1);
-    g.fillStyle = '#8f5d3e'; g.beginPath(); g.ellipse(-5, -12.4, 6.6, 3, -0.35, 0, TAU); g.fill();
+    g.moveTo(-R - 1, 2);
+    g.bezierCurveTo(-R - 3, -14, -9, -21, 0, -21);
+    g.bezierCurveTo(9, -21, R + 3, -14, R + 1, 2);
+    // 前髪のふち: 丸いふさを並べる
+    const lobes = [[R - 1, -2], [10, -7], [4, -9], [-3, -9.5], [-9, -7.5], [-R + 1, -2]];
+    let px = R + 1; let py = 2;
+    for (const [x, y] of lobes) { const mx = (px + x) / 2; const my = (py + y) / 2 + 3.6; g.quadraticCurveTo(mx, my, x, y); px = x; py = y; }
+    g.closePath();
+    fillStroke(g, '#6b3f2a', 2.2);
+    g.save(); g.clip();
+    g.fillStyle = '#8f5d3e'; g.beginPath(); g.ellipse(-5, -14, 8, 3.6, -0.35, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(255,230,200,0.22)'; g.beginPath(); g.ellipse(-7, -16, 5, 1.6, -0.35, 0, TAU); g.fill();
+    g.restore();
+    // サイドの髪(耳の前)
+    for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * (R - 1), -1); g.quadraticCurveTo(sx * (R + 3), 4, sx * (R - 2), 9); g.quadraticCurveTo(sx * (R - 4), 4, sx * (R - 1), -1); g.closePath(); fillStroke(g, '#6b3f2a', 2); }
     const hat = P.outfit && P.outfit.hat;
     if (!hat || hat === 'none' || hat === 'flower') {
       g.strokeStyle = OUT; g.lineWidth = 2.4; g.lineCap = 'round';
-      g.beginPath(); g.moveTo(1, -17.6); g.quadraticCurveTo(-5 - hb, -24, 3 - hb * 1.5, -25.6); g.stroke();
+      g.beginPath(); g.moveTo(1, -20.6); g.quadraticCurveTo(-5 - hb, -27, 3 - hb * 1.5, -28.6); g.stroke();
       g.strokeStyle = '#6b3f2a'; g.lineWidth = 1.1; g.stroke();
     }
     drawHat(g, hat, lx);
@@ -726,6 +743,7 @@ const Art = (() => {
   }
   function drawHat(g, hat, lx) {
     if (!hat || hat === 'none') return;
+    g.save(); g.translate(0, -3); g.scale(1.1, 1.1);
     if (hat === 'cap') {
       g.beginPath(); g.moveTo(-13.5, -8); g.bezierCurveTo(-14, -20, -6, -24, 0, -24); g.bezierCurveTo(6, -24, 14, -20, 13.5, -8); g.closePath(); fillStroke(g, '#e53d4f', 2.2);
       g.fillStyle = 'rgba(255,255,255,0.25)'; g.beginPath(); g.ellipse(-5, -17, 5, 3, -0.4, 0, TAU); g.fill();
@@ -748,6 +766,7 @@ const Art = (() => {
       star(g, 4, -36, 5, 0.3, '#ffe14d', 1.4); star(g, -4, -20, 2.4, 0, '#fff6a8', 0); star(g, 6, -16, 2, 1, '#fff6a8', 0);
       ell(g, 0, -10, 14.5, 4, '#2f4c8c', 2);
     }
+    g.restore();
   }
 
   // ---------- どうぶつ ----------
@@ -1065,7 +1084,7 @@ const Art = (() => {
     const bob = Math.sin(t * 3 + c.t) * 2;
     softShadow(g, 20, 8, 0.4, 0, 2);
     g.save(); g.translate(0, -bob);
-    const col = { roller: '#ff5fa8', sprinkler: '#5fc8ff', boomerang: '#ffb347', bomb: '#c35cff', mist: '#c8ecff', rainbow: '#ff8ad0' }[c.w] || '#fff';
+    const col = { boomerang: '#ffb347', missile: '#ff6a3d', omni: '#9be0ff', rainbow: '#ff8ad0' }[c.w] || '#fff';
     g.save(); g.globalAlpha = 0.5 + Math.sin(t * 5) * 0.2; blit(g, S.glowGold, 0, -14, 0.7); g.restore();
     rrect(g, -16, -30, 32, 28, 4, '#c9955c', 2.4);
     g.fillStyle = 'rgba(80,40,10,0.25)'; g.fillRect(-16, -16, 32, 3); g.fillRect(-2, -30, 3, 28);
@@ -1078,34 +1097,6 @@ const Art = (() => {
   }
 
   // ---------- 武器(スプリンクラー・ばくだん・ブーメラン) ----------
-  function drawSprinkler(g, sp, t) {
-    softShadow(g, 14, 6, 0.36, 0, 2);
-    rrect(g, -9, -8, 18, 9, 3, '#8fd8ff', 2);
-    g.fillStyle = 'rgba(0,40,80,0.25)'; g.fillRect(-7, -3, 14, 2);
-    rrect(g, -3, -20, 6, 13, 2, '#5fc8ff', 1.8);
-    g.save(); g.translate(0, -20); g.rotate(sp.a);
-    g.strokeStyle = OUT; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(-12, 0); g.lineTo(12, 0); g.stroke();
-    g.strokeStyle = '#fff'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(-12, 0); g.lineTo(12, 0); g.stroke();
-    g.fillStyle = 'rgba(255,61,154,0.55)';
-    for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * 12, 0); g.lineTo(sx * 40, -7); g.lineTo(sx * 40, 7); g.closePath(); g.fill(); }
-    g.restore();
-    // 残り時間
-    const k = clamp(sp.life / 12, 0, 1);
-    g.fillStyle = 'rgba(40,20,50,0.6)'; g.fillRect(-12, -30, 24, 4); g.fillStyle = '#5fc8ff'; g.fillRect(-12, -30, 24 * k, 4);
-  }
-  function drawBomb(g, b, t) {
-    const z = b.z || 0;
-    softShadow(g, 12 - z * 0.05, 5, 0.36, 0, 2);
-    g.save(); g.translate(0, -z);
-    const blink = b.z === 0 && b.fuse < 1 && Math.floor(t * 12) % 2 === 0;
-    circ(g, 0, -12, 12, blink ? '#fff' : b.power ? '#ffd23f' : '#a24be0', 2.2);
-    g.fillStyle = 'rgba(255,255,255,0.45)'; g.beginPath(); g.ellipse(-4, -16, 4, 2.6, -0.5, 0, TAU); g.fill();
-    g.fillStyle = 'rgba(20,0,50,0.3)'; g.beginPath(); g.ellipse(4, -8, 6, 4, 0, 0, TAU); g.fill();
-    for (const [x, y] of [[-5, -8], [6, -14], [1, -20]]) circ(g, x, y, 2, '#ff3d9a', 0);
-    g.strokeStyle = OUT; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath(); g.moveTo(3, -23); g.quadraticCurveTo(9, -30, 7, -35); g.stroke();
-    if (b.z === 0) star(g, 7, -36, 4 + Math.sin(t * 30) * 1.5, t * 10, '#ffe14d', 0);
-    g.restore();
-  }
   function drawBoomerang(g, lv, gold) {
     const s = 0.9 + lv * 0.25;
     g.save(); g.scale(s, s);
@@ -1219,7 +1210,7 @@ const Art = (() => {
     if (what === 'poison') blit(g, S.mush.poison[0], 0, 0);
     else if (what === 'good') blit(g, S.mush.good[0], 0, 0);
     else if (what === 'boss') { g.scale(0.36, 0.36); g.translate(0, 0); drawBoss(g, { weak: 1, wob: 0, intro: 0, flash: 0 }, 0.5); }
-    else if (what === 'crate') { g.scale(1.3, 1.3); drawCrate(g, { w: 'bomb', t: 0 }, 0.4); }
+    else if (what === 'crate') { g.scale(1.3, 1.3); drawCrate(g, { w: 'missile', t: 0 }, 0.4); }
     else if (what === 'gold') { g.scale(0.9, 0.9); drawGold(g, { moving: true, runT: 1.2, face: 1, hitT: 0 }, 0.4); }
     else if (what === 'rabbit') { g.scale(1.5, 1.5); drawRabbit(g, fake, 0); }
     else if (what === 'squirrel') { g.scale(1.5, 1.5); drawSquirrel(g, fake, 0); }
@@ -1230,5 +1221,5 @@ const Art = (() => {
     g.restore();
   }
 
-  return { OUT, INK, S, init, blit, mk, drawBoy, drawBoar, drawBear, drawGorilla, drawRabbit, drawSquirrel, drawGold, drawCrate, drawBoss, drawSprinkler, drawBomb, drawBoomerang, drawBridge, drawIcon, star, ell, circ, poly, rrect, shadow, TREE_COL };
+  return { OUT, INK, S, init, blit, mk, drawBoy, drawBoar, drawBear, drawGorilla, drawRabbit, drawSquirrel, drawGold, drawCrate, drawBoss, drawBoomerang, drawBridge, drawIcon, star, ell, circ, poly, rrect, shadow, TREE_COL };
 })();

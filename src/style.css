@@ -96,11 +96,10 @@ body.touch canvas#game { cursor: default; }
 .m-prog { font-size: 12px; color: var(--purple); font-variant-numeric: tabular-nums; }
 body.touch .mission { bottom: calc(150px + var(--safe-b)); max-width: 40vw; font-size: 12px; }
 .chip.weapon { background: linear-gradient(#8fd8ff, #2f9ad8); }
-.chip.weapon.roller { background: linear-gradient(#ff8ac4, #e0348a); }
 .chip.weapon.boomerang { background: linear-gradient(#ffc36a, #e07a1a); }
-.chip.weapon.bomb { background: linear-gradient(#d49bff, #8a3fd0); }
-.chip.weapon.mist { background: linear-gradient(#e8f6ff, #9fd0f0); color: var(--ink); text-shadow: none; }
-.chip.weapon.mist i { color: var(--ink); }
+.chip.weapon.missile { background: linear-gradient(#ff9a7a, #d9452a); }
+.chip.weapon.omni { background: linear-gradient(#c8f0ff, #5bb8e8); color: var(--ink); text-shadow: none; }
+.chip.weapon.omni i { color: var(--ink); }
 .chip.weapon.rainbow { background: linear-gradient(90deg, #ff8ad0, #ffe14d, #9dffb0, #9be0ff, #d49bff); color: var(--ink); text-shadow: none; }
 .chip.weapon.rainbow i { color: var(--ink); }
 .lead .ev-t { color: #8a3fd0; }

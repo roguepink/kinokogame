@@ -305,7 +305,6 @@ function updatePlayer(dt) {
 
   let mv = playing ? Input.move() : { x: 0, y: 0 };
   let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1) * Features.playerSpeedMul();
-  if ((P.inkT || 0) > 0) P.inkT -= dt; // インクまみれ(ばくだんに巻きこまれた)
   const tx = mv.x * speed;
   const ty = mv.y * speed;
   P.vx = approach(P.vx, tx, C.accel * dt);
@@ -344,7 +343,7 @@ function updatePlayer(dt) {
   P.aim = a.angle;
   P.face = Math.cos(P.aim) >= 0 ? 1 : -1;
   P.firing = a.fire && playing;
-  const aimA = (P.firing || G.charge > 0) ? (a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim) : P.aim;
+  const aimA = P.firing ? (a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim) : P.aim;
   if (!Features.weaponFire(P, aimA, dt) && P.firing && P.fireCd <= 0) {
     shoot(P, aimA);
     P.fireCd = 1 / (G.power > 0 ? CONFIG.power.rate : CONFIG.gun.rate);
@@ -405,8 +404,6 @@ function updateProjectiles(dt) {
     p.t += dt;
     if (p.homing) homeProjectile(p, dt);
     p.x += p.vx * dt; p.y += p.vy * dt;
-    // 霧の中を通った弾は 2倍
-    if (!p.wet && (G.mists && G.mists.length) && Features.inMist(p.x, p.y)) { p.wet = true; p.dmg = (p.dmg || 1) * 2; }
     p.dropT += Math.hypot(p.vx, p.vy) * dt;
     if (!p.bubble) p.h = Math.max(4, p.h - dt * 14);
     if (p.dropT > 140) { p.dropT = 0; addDecal(p.x + rr(-5, 5), p.y + rr(-5, 5), 0.34, 'drop', 6); }
@@ -465,26 +462,37 @@ function updateProjectiles(dt) {
 
 // パワーアップ中の弾は、近くの毒キノコ・敵に曲がって飛んでいく
 function homeProjectile(p, dt) {
-  const sp = Math.hypot(p.vx, p.vy);
+  let sp = Math.hypot(p.vx, p.vy);
+  if (p.missile) { sp = Math.min(sp + p.accel * dt, 760); if (Math.random() < dt * 60) addParticle({ x: p.x, y: p.y - p.h, vx: rr(-20, 20), vy: rr(-20, 20), ay: 0, drag: 2, life: 0.35, max: 0.35, size: rr(3, 6), grow: 10, color: 'rgba(255,200,170,0.55)', shape: 'dust', rot: 0, vr: 0 }); }
   const a = Math.atan2(p.vy, p.vx);
   let best = null;
-  let bestD = 360;
+  let bestD = p.seek || 360;
   const test = (o) => {
     const d = Math.hypot(o.x - p.x, o.y - p.y);
     if (d > bestD || d < 6) return;
-    if (Math.abs(angleDiff(a, Math.atan2(o.y - p.y, o.x - p.x))) > 1.3) return;
+    if (!p.missile && Math.abs(angleDiff(a, Math.atan2(o.y - p.y, o.x - p.x))) > 1.3) return;
     bestD = d; best = o;
   };
   for (const m of G.mushrooms) if (!m.dead && m.type !== 'good') test(m);
   for (const e of G.enemies) if (e.state !== 'flee' && e.state !== 'ally') test(e);
-  if (!best) return;
+  if (!best) { p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp; return; }
   const want = Math.atan2(best.y - (best.kind === 'enemy' ? 10 : 0) - p.y, best.x - p.x);
-  const na = a + clamp(angleDiff(a, want), -CONFIG.power.homing * dt, CONFIG.power.homing * dt);
+  const turn = p.turn || CONFIG.power.homing;
+  const na = a + clamp(angleDiff(a, want), -turn * dt, turn * dt);
   p.vx = Math.cos(na) * sp; p.vy = Math.sin(na) * sp;
+}
+
+function missileSplash(p, skip) {
+  ring(p.x, p.y - 8, 6, 70, 0.3, 'rgba(255,120,80,0.9)', 4);
+  burst(p.x, p.y - 8, 10, { s0: 40, s1: 150, l0: 0.3, l1: 0.6, z0: 2, z1: 4.5, color: ['#ff6a3d', '#ffb347', '#fff'], shape: 'ink', ay: 260 });
+  G.cam.shake = Math.max(G.cam.shake, 4);
+  for (const m of G.mushrooms) { if (m === skip || m.dead || m.type === 'good') continue; if (Math.hypot(m.x - p.x, m.y - p.y) < 70 + m.hr) hitMushroom(m, { x: m.x, y: m.y - 8, vx: (m.x - p.x) * 3, vy: (m.y - p.y) * 3, dmg: 1, gold: p.gold, quiet: true }); }
+  for (const e of G.enemies) { if (e === skip || e.state === 'flee' || e.state === 'ally') continue; if (Math.hypot(e.x - p.x, e.y - p.y) < 70 + e.def.hr) hitEnemy(e, { x: e.x, y: e.y - 10, vx: (e.x - p.x) * 3, vy: (e.y - p.y) * 3, dmg: 1, gold: p.gold }); }
 }
 
 function hitMushroom(m, p) {
   const dmg = p.dmg || 1;
+  if (p.missile && !p.splashed) { p.splashed = true; missileSplash(p, m); }
   m.hp -= dmg;
   m.wob = 0.3;
   m.hitT = 0.14;
@@ -541,6 +549,7 @@ function activatePower() {
 }
 
 function hitEnemy(e, p) {
+  if (p.missile && !p.splashed) { p.splashed = true; missileSplash(p, e); }
   e.hp -= p.dmg || 1;
   e.flash = 0.12;
   e.slow = 0.5;
@@ -984,7 +993,8 @@ function updateParticles(dt) {
 function updateDirector(dt) {
   const D = CONFIG.director;
   const target = Math.min(D.max, D.start + Math.floor(G.t / D.every));
-  if (G.enemies.length < target) {
+  const hostile = G.enemies.filter((e) => e.state !== 'ally').length;
+  if (hostile < target) {
     G.spawnT = (G.spawnT || 0) - dt;
     if (G.spawnT <= 0) { G.spawnT = 1.5; spawnEnemy(false); }
   }

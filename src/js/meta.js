@@ -22,12 +22,10 @@ const Meta = (() => {
     { id: 'bear', name: 'クマ', icon: 'bear', desc: 'つめで なぎはらう。タフ。' },
     { id: 'gorilla', name: 'ゴリラ', icon: 'gorilla', desc: 'ジャンプして 着地の しょうげき波。' },
     { id: 'boss', name: 'キノコおやかた', icon: 'boss', desc: '森の ぬし。かさを あげた ときが チャンス。' },
-    { id: 'w_roller', name: 'ペイントローラー', icon: 'crate', desc: '歩いた道を 塗る。帯の上は 速い。' },
-    { id: 'w_sprinkler', name: 'スプリンクラー', icon: 'crate', desc: '置くと まわりに まきつづける。' },
-    { id: 'w_boomerang', name: 'ブーメラン', icon: 'crate', desc: 'キャッチすると 大きくなる。' },
-    { id: 'w_bomb', name: 'インクばくだん', icon: 'crate', desc: '3びょうで 大爆発。' },
-    { id: 'w_mist', name: '霧ふき', icon: 'crate', desc: '霧の中の 弾は 2倍。' },
-    { id: 'w_rainbow', name: '虹の水てっぽう', icon: 'crate', desc: 'かくし武器。金色のキノコを 3回 たおすと 箱に 入る。', secret: true },
+    { id: 'w_boomerang', name: 'ブーメラン', icon: 'crate', desc: '次々 投げられる。キャッチすると 大きくなる。' },
+    { id: 'w_missile', name: 'ゆうどうミサイル', icon: 'crate', desc: 'てきを 自動で おいかけて はじける。' },
+    { id: 'w_omni', name: 'オムニショット', icon: 'crate', desc: '四方八方に いっせいに うつ。' },
+    { id: 'w_rainbow', name: '虹の水てっぽう', icon: 'crate', desc: '当てた どうぶつが ずっと なかまに。' },
   ];
   function codexSee(id) { const c = D.codex[id] || (D.codex[id] = { seen: 0, killed: 0 }); c.seen += 1; if (c.seen === 1) { save(); if (typeof UI !== 'undefined' && G.state === 'playing') UI.toast('ずかんに とうろく: ' + (CODEX.find((x) => x.id === id) || { name: id }).name, 2200); } }
   function codexKill(id) { const c = D.codex[id] || (D.codex[id] = { seen: 0, killed: 0 }); c.killed += 1; if (c.seen === 0) c.seen = 1; }
@@ -51,7 +49,8 @@ const Meta = (() => {
     { id: 'nopoison', name: 'よく見て あるく', desc: 'どくを 1回も たべずに 20本 きれいにする', test: (s) => s.poisoned === 0 && s.purified >= 20 },
     { id: 'eat10', name: 'きのこ グルメ', desc: 'ふつうのキノコを ぜんぶで 10個', test: () => ((D.codex.good && D.codex.good.killed) || 0) >= 10 },
     { id: 'boost20', name: 'どうぶつの ともだち', desc: 'うさぎ・リスに ぜんぶで 20回', test: () => (D.boosts || 0) >= 20 },
-    { id: 'weapons', name: '武器マスター', desc: '5しゅるいの 武器を ぜんぶ 使う', test: () => ['w_roller', 'w_sprinkler', 'w_boomerang', 'w_bomb', 'w_mist'].every((k) => D.codex[k] && D.codex[k].seen > 0) },
+    { id: 'weapons', name: '武器マスター', desc: '4しゅるいの 武器を ぜんぶ 使う', test: () => ['w_boomerang', 'w_missile', 'w_omni', 'w_rainbow'].every((k) => D.codex[k] && D.codex[k].seen > 0) },
+    { id: 'allies3', name: 'どうぶつ たいちょう', desc: '1ゲームで 3匹を なかまに する', test: (s) => (s.allies || 0) >= 3 },
     { id: 'rainbow', name: 'にじいろの きずな', desc: '虹の水てっぽうで なかまに した どうぶつが 敵を たおす', test: (s) => (s.allyKills || 0) >= 1 },
     { id: 'night', name: 'よるの ハンター', desc: '夜に 金色のキノコを たおす', test: (s) => s.nightGold >= 1 },
     { id: 's12k', name: 'もりの でんせつ', desc: 'スコア 12000', test: (s, score) => score >= 12000 },
