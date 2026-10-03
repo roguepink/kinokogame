@@ -9,7 +9,7 @@ const UI = {
   last: {},
   init() {
     for (const id of ['hud', 'hpFill', 'hpText', 'score', 'combo', 'comboN', 'comboM', 'comboFill', 'chips', 'timer', 'btnSound', 'btnPause', 'toast', 'banner', 'hint',
-      'title', 'pause', 'result', 'touchHints', 'thL', 'thR', 'btnStart', 'btnResume', 'btnQuit', 'btnRetry', 'btnToTitle', 'bestTitle', 'resTitle', 'resRank', 'resMsg', 'resScore', 'resNew', 'resStats']) {
+      'title', 'pause', 'result', 'touchHints', 'thL', 'thR', 'event', 'eventText', 'eventFill', 'bossBar', 'bossFill', 'mission', 'missionText', 'missionProg', 'hiscores', 'todayForest', 'btnStart', 'btnResume', 'btnQuit', 'btnRetry', 'btnToTitle', 'bestTitle', 'resTitle', 'resRank', 'resMsg', 'resScore', 'resNew', 'resStats']) {
       this.el[id] = $(id);
     }
   },
@@ -77,11 +77,59 @@ const UI = {
     });
     if (slow) { const c = $('chipSlow'); if (c) c.textContent = P.slowT.toFixed(1) + 's'; }
     if (boost) { const c = $('chipBoost'); if (c) c.textContent = P.boostT.toFixed(1) + 's'; }
+    // 武器
+    const wkey = G.weapon || '';
+    this.set('weaponKey', wkey, (v) => {
+      const old = e.chips.querySelector('.chip.weapon'); if (old) old.remove();
+      if (v) { const d = document.createElement('div'); d.className = 'chip weapon ' + v; d.innerHTML = Features.C.weapons[v].name + '<i id="chipWeapon"></i>'; e.chips.appendChild(d); }
+    });
+    if (wkey) { const c = $('chipWeapon'); if (c) c.textContent = G.weaponT.toFixed(1) + 's'; }
+    // 大発生
+    const ev = G.ev;
+    this.set('evShow', !!ev, (v) => e.event.classList.toggle('hidden', !v));
+    if (ev) {
+      const alive = ev.mush.length;
+      this.set('evText', Math.ceil(ev.left) + ':' + alive, () => { e.eventText.textContent = 'どくの大発生! のこり ' + alive + '本 / ' + Math.ceil(ev.left) + 'びょう'; });
+      e.eventFill.style.width = clamp(ev.left / Features.C.outbreak.limit, 0, 1) * 100 + '%';
+    }
+    // ボス
+    const B = G.boss;
+    this.set('bossShow', !!(B && !B.dead), (v) => e.bossBar.classList.toggle('hidden', !v));
+    if (B) e.bossFill.style.width = clamp(B.hp / B.maxHp, 0, 1) * 100 + '%';
+    // ミッション
+    const M = G.missions;
+    const cur = M && M.cur;
+    this.set('missionShow', !!cur && G.state === 'playing', (v) => e.mission.classList.toggle('hidden', !v));
+    if (cur) {
+      this.set('missionText', cur.def.id, () => { e.missionText.textContent = cur.def.text; });
+      this.set('missionProg', cur.prog + '/' + cur.def.n, (v) => { e.missionProg.textContent = v; });
+    }
+    this.set('missionFlash', M && M.flash > 0, (v) => e.mission.classList.toggle('done', !!v));
     if (power) { const c = $('chipPower'); if (c) c.textContent = G.power.toFixed(1) + 's'; const f = $('chipPowerFill'); if (f) f.style.width = (G.power / CONFIG.power.time) * 100 + '%'; }
   },
 };
 
 // ---------- ハイスコア ----------
+function loadTable() { try { const t = JSON.parse(localStorage.getItem('kinoko_table') || '[]'); return Array.isArray(t) ? t : []; } catch (e) { return []; } }
+function saveTable(t) { try { localStorage.setItem('kinoko_table', JSON.stringify(t.slice(0, 5))); } catch (e) { /* 無視 */ } }
+function addToTable(score, rank) {
+  const t = loadTable();
+  const d = new Date();
+  t.push({ s: score, r: rank, d: (d.getMonth() + 1) + '/' + d.getDate() });
+  t.sort((a, b) => b.s - a.s);
+  saveTable(t);
+  return t.slice(0, 5);
+}
+function renderTable() {
+  const t = loadTable().slice(0, 5);
+  UI.el.hiscores.innerHTML = t.map((r) => `<li>${r.r}ランク ${r.d}<span>${r.s.toLocaleString('en-US')}</span></li>`).join('');
+}
+// 日替わりの森: 日付からシードを決める
+function dailySeed() {
+  const d = new Date();
+  const n = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  return (CONFIG.world.seed + n * 7919) >>> 0;
+}
 function loadBest() { try { return parseInt(localStorage.getItem('kinoko_best') || '0', 10) || 0; } catch (e) { return 0; } }
 function saveBest(v) { try { localStorage.setItem('kinoko_best', String(v)); } catch (e) { /* 保存できなくても遊べる */ } }
 
@@ -128,15 +176,17 @@ function showResult() {
   if (isBest) saveBest(G.score);
   const e = UI.el;
   e.resTitle.textContent = reason === 'time' ? 'タイムアップ!' : 'やられちゃった…';
-  const ranks = [[9000, 'S', 'もりの でんせつ!'], [5000, 'A', 'もりの ヒーロー!'], [2500, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
-  const [, letter, msg] = ranks.find((r) => G.score >= r[0]);
+  const ranks = [[12000, 'S', 'もりの でんせつ!'], [7000, 'A', 'もりの ヒーロー!'], [3500, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
+  let [, letter, msg] = ranks.find((r) => G.score >= r[0]);
+  if (G.stats.boss && letter !== 'S') { letter = String.fromCharCode(letter.charCodeAt(0) - 1); if (letter === '@') letter = 'S'; msg = 'ボスを たおした! ' + msg; }
+  addToTable(G.score, letter); renderTable();
   e.resRank.textContent = letter;
   e.resRank.style.background = letter === 'S' ? 'radial-gradient(circle at 35% 30%, #fff6a0, #ff5fb0)' : letter === 'A' ? 'radial-gradient(circle at 35% 30%, #ffe98a, #ff9d2e)' : letter === 'B' ? 'radial-gradient(circle at 35% 30%, #c8f5b0, #43c06a)' : 'radial-gradient(circle at 35% 30%, #d8e6ff, #7a9be0)';
   e.resMsg.textContent = msg;
   e.resScore.textContent = G.score.toLocaleString('en-US');
   e.resNew.classList.toggle('hidden', !isBest || G.score === 0);
   const s = G.stats;
-  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった どうぶつ', s.inked + '匹'], ['体当たりで ふっとばし', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
+  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['ミッション', s.missions + '個'], ['大発生を しずめた', s.outbreaksCleared + '/' + s.outbreaks + '回'], ['キノコおやかた', s.boss ? 'たいじ!' : 'にがした'], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった どうぶつ', s.inked + '匹'], ['体当たりで ふっとばし', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
   e.resStats.innerHTML = rows.map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
   e.bestTitle.textContent = Math.max(prevBest, G.score).toLocaleString('en-US');
   UI.show('result', true);
@@ -261,8 +311,10 @@ function boot() {
   G.cam = { x: 0, y: 0, shake: 0, kx: 0, ky: 0 };
   G.view = { left: 0, top: 0 };
   G.clock = 0; G.paused = false; G.state = 'title'; G.dispScore = 0;
-  G.world = buildWorld(CONFIG.world.seed);
+  G.world = buildWorld(dailySeed());
   UI.init();
+  { const d = new Date(); $('todayForest').textContent = 'きょうの森 ' + (d.getMonth() + 1) + '/' + d.getDate() + '(まいにち ちがう森)'; }
+  renderTable();
   resetGame();
   Render.resize();
   Render.buildMini();
@@ -308,12 +360,12 @@ function boot() {
   window.addEventListener('blur', () => { if (G.state === 'playing') setPaused(true); });
 
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');
-  for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gold', 'gold'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar']]) Art.drawIcon($(id), what);
+  for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gold', 'gold'], ['ic-boss', 'boss'], ['ic-crate', 'crate'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar']]) Art.drawIcon($(id), what);
 
   drawMapIcon($('ic-map'));
 
   // 動作確認用: URL に ?debug を付けるとコンソールから状態を触れる
-  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
+  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, Features, purify, hitMushroom, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
 
   requestAnimationFrame(loop);
 }

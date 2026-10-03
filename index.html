@@ -40,6 +40,8 @@ body.touch canvas#game { cursor: default; }
 #fx, #fx div { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
 #fxVig { background: radial-gradient(ellipse at center, rgba(255, 230, 160, 0.06) 0%, rgba(15, 60, 50, 0) 45%, rgba(10, 45, 40, 0.45) 100%); }
 #fxRed { opacity: 0; background: radial-gradient(ellipse at center, rgba(255, 30, 60, 0) 30%, rgba(255, 30, 60, 0.85) 100%); }
+#fxEve { opacity: 0; background: linear-gradient(rgba(255, 150, 60, 0.18), rgba(255, 110, 90, 0.26)); mix-blend-mode: multiply; }
+#fxNight { opacity: 0; background: radial-gradient(ellipse 34% 40% at 50% 52%, rgba(10, 20, 60, 0.12) 0%, rgba(8, 15, 50, 0.5) 60%, rgba(5, 10, 40, 0.72) 100%); }
 #fxPurple { opacity: 0; background: radial-gradient(ellipse at center, rgba(170, 60, 255, 0) 30%, rgba(170, 60, 255, 0.8) 100%); }
 
 /* ---------- ゲーム中のHUD ---------- */
@@ -88,6 +90,32 @@ body.touch canvas#game { cursor: default; }
 .icon-btn svg { width: 100%; height: 100%; display: block; }
 .icon-btn.muted #iconWaves { display: none; }
 
+/* イベント・ボス・ミッション */
+.hud-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.event { min-width: 220px; padding: 3px 14px 8px; text-align: center; font-size: 15px; color: #fff; background: linear-gradient(#c56bff, #7a2fc0); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 3px 0 rgba(53, 40, 63, 0.45); text-shadow: 0 1px 0 var(--ink); position: relative; animation: bump 0.3s; }
+.event-bar { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 4px; border-radius: 3px; background: rgba(53, 40, 63, 0.4); overflow: hidden; }
+.event-bar div { height: 100%; width: 100%; background: #fff; }
+.boss { width: min(44vw, 420px); padding: 2px 12px 8px; text-align: center; font-size: 14px; color: #fff; background: rgba(53, 40, 63, 0.85); border: 3px solid var(--ink); border-radius: 14px; position: relative; text-shadow: 0 1px 0 #000; }
+.boss-bar { margin-top: 2px; height: 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.5); overflow: hidden; border: 1.5px solid #000; }
+.boss-bar div { height: 100%; width: 100%; background: linear-gradient(#c56bff, #7a2fc0); transition: width 0.15s; }
+.mission { position: absolute; left: calc(10px + var(--safe-l)); bottom: calc(14px + var(--safe-b)); max-width: 46vw; padding: 4px 12px 6px; background: rgba(255, 253, 244, 0.92); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 rgba(53, 40, 63, 0.45); font-size: 13px; }
+.mission.done { animation: bump 0.4s; background: #d8ffd8; }
+.m-label { font-size: 10px; color: var(--green); letter-spacing: 0.1em; }
+.m-text { font-size: 13px; line-height: 1.3; }
+.m-prog { font-size: 12px; color: var(--purple); font-variant-numeric: tabular-nums; }
+body.touch .mission { bottom: calc(150px + var(--safe-b)); max-width: 40vw; font-size: 12px; }
+.chip.weapon { background: linear-gradient(#8fd8ff, #2f9ad8); }
+.chip.weapon.spread { background: linear-gradient(#ffc36a, #e07a1a); }
+.chip.weapon.bubble { background: linear-gradient(#c8f0ff, #5bb8e8); color: var(--ink); text-shadow: none; }
+.chip.weapon.bubble i { color: var(--ink); }
+.lead .ev-t { color: #8a3fd0; }
+.lead .boss-t { color: #5a2d80; }
+.legend li.boss-l { background: linear-gradient(#f3e6ff, #e2ccff); border-color: #5a2d80; }
+.today { display: block; font-size: 12px; opacity: 0.75; }
+.hiscores { margin: 6px auto 0; padding: 0 0 0 1.6em; max-width: 300px; text-align: left; font-size: 12.5px; line-height: 1.5; }
+.hiscores li span { float: right; color: var(--pink); font-variant-numeric: tabular-nums; }
+.hiscores:empty { display: none; }
+
 /* ---------- 仮想スティック ---------- */
 .stick { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 5; }
 .stick .ring { position: absolute; left: -56px; top: -56px; width: 112px; height: 112px; border-radius: 50%; border: 4px dashed rgba(255, 255, 255, 0.75); background: rgba(255, 255, 255, 0.18); }
@@ -95,7 +123,7 @@ body.touch canvas#game { cursor: default; }
 .stick.right .knob { background: rgba(255, 150, 205, 0.95); }
 
 /* ---------- ふきだし ---------- */
-#toast { position: fixed; top: calc(88px + var(--safe-t)); left: 50%; transform: translateX(-50%); max-width: 90vw; padding: 6px 18px; font-size: clamp(14px, 3.6vw, 18px); background: #fff; border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 4px 0 rgba(53, 40, 63, 0.5); pointer-events: none; z-index: 8; animation: toast-in 0.25s; text-align: center; }
+#toast { position: fixed; top: calc(132px + var(--safe-t)); left: 50%; transform: translateX(-50%); max-width: 90vw; padding: 6px 18px; font-size: clamp(14px, 3.6vw, 18px); background: #fff; border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 4px 0 rgba(53, 40, 63, 0.5); pointer-events: none; z-index: 8; animation: toast-in 0.25s; text-align: center; }
 #banner { position: fixed; left: 0; right: 0; top: 34%; text-align: center; pointer-events: none; z-index: 8; font-size: clamp(44px, 12vw, 96px); color: #fff; -webkit-text-stroke: 8px var(--ink); paint-order: stroke fill; text-shadow: 0 8px 0 rgba(53, 40, 63, 0.45); animation: banner 1.4s ease-out forwards; }
 #hint { position: fixed; bottom: calc(18px + var(--safe-b)); left: 50%; transform: translateX(-50%); max-width: 94vw; padding: 6px 16px; font-size: clamp(12px, 3.2vw, 16px); background: rgba(255, 255, 255, 0.92); border: 3px solid var(--ink); border-radius: 18px; pointer-events: none; z-index: 8; text-align: center; animation: toast-in 0.3s; }
 
@@ -162,6 +190,7 @@ body.touch .controls .touch-only { display: block; }
   .logo h1 { font-size: clamp(30px, 7vw, 48px); -webkit-text-stroke-width: 7px; }
   .lead { margin: 2px 0 6px; font-size: 12px; line-height: 1.45; }
   .legend { grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 6px; }
+  .hiscores { display: none; }
   .legend li { grid-template-columns: 40px 1fr; padding: 3px 6px; }
   .legend canvas { width: 40px; height: 40px; }
   .legend li.enemy { grid-column: 1 / 4; grid-template-columns: repeat(3, 34px) 1fr; }
@@ -173,6 +202,11 @@ body.touch .controls .touch-only { display: block; }
   .best { margin-top: 4px; font-size: 12px; }
   .rank { width: 64px; height: 64px; font-size: 42px; }
   .res-stats { font-size: 12px; }
+}
+@media (min-width: 640px) and (min-height: 561px) {
+  .legend { grid-template-columns: repeat(3, 1fr); }
+  .legend li.enemy { grid-column: 1 / 4; }
+  .lead { margin-bottom: 6px; }
 }
 @media (max-width: 420px) {
   .legend { grid-template-columns: 1fr; }
@@ -208,7 +242,9 @@ body.touch #touchHints.show { display: block; }
   .combo { padding: 2px 9px 7px; }
   .combo-n { font-size: 16px; }
   .combo-m { font-size: 12px; }
-  #toast { top: calc(100px + var(--safe-t)); }
+  #toast { top: calc(150px + var(--safe-t)); }
+  .boss { width: 150px; font-size: 11px; padding: 1px 8px 6px; }
+  .event { min-width: 0; font-size: 12px; padding: 2px 10px 7px; }
 }
 @media (max-width: 340px) {
   .hp-bar { width: 66px; }
@@ -230,7 +266,7 @@ body.touch #touchHints.show { display: block; }
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="fx"><div id="fxVig"></div><div id="fxRed"></div><div id="fxPurple"></div></div>
+<div id="fx"><div id="fxEve"></div><div id="fxNight"></div><div id="fxVig"></div><div id="fxRed"></div><div id="fxPurple"></div></div>
 
 <!-- ゲーム中の表示 -->
 <div id="hud" class="hidden">
@@ -243,7 +279,12 @@ body.touch #touchHints.show { display: block; }
     <div class="combo hidden" id="combo"><span class="combo-n" id="comboN"></span><span class="combo-m" id="comboM"></span><div class="combo-bar"><div id="comboFill"></div></div></div>
     <div class="chips" id="chips"></div>
   </div>
-  <div class="hud-center"><div class="timer" id="timer">3:00</div></div>
+  <div class="hud-center">
+    <div class="timer" id="timer">3:00</div>
+    <div class="event hidden" id="event"><span id="eventText"></span><div class="event-bar"><div id="eventFill"></div></div></div>
+    <div class="boss hidden" id="bossBar"><span>キノコおやかた</span><div class="boss-bar"><div id="bossFill"></div></div></div>
+  </div>
+  <div class="mission hidden" id="mission"><div class="m-label">ミッション</div><div class="m-text" id="missionText"></div><div class="m-prog" id="missionProg"></div></div>
   <div class="hud-right">
     <canvas id="minimap"></canvas>
     <div class="btns">
@@ -269,12 +310,14 @@ body.touch #touchHints.show { display: block; }
       <div class="logo-small">インクで もりを おそうじ!</div>
       <h1><span class="l1">どく</span><span class="l2">キノコ</span><span class="l3">大作戦</span></h1>
     </div>
-    <p class="lead">もりに はえた <b class="poison">どくキノコ</b>を インクの みずでっぽうで うちまくれ!<br>せいげんじかんは <b>3ぷん</b>。 <b class="gold-t">金色のキノコ</b>を たおすと むてきの パワーアップ!</p>
+    <p class="lead">もりに はえた <b class="poison">どくキノコ</b>を インクの みずでっぽうで うちまくれ!<br>せいげんじかんは <b>3ぷん</b>(ミッションで のびる)。 <b class="ev-t">どくの大発生</b>を しずめ、<b class="gold-t">金色のキノコ</b>で パワーアップ、さいごは <b class="boss-t">ボス</b>!</p>
     <ul class="legend">
       <li><canvas id="ic-poison" width="72" height="72"></canvas><b>どくキノコ</b><span>うって きれいにしよう<br>(さわると のろのろ…)</span></li>
       <li><canvas id="ic-good" width="72" height="72"></canvas><b>ふつうのキノコ</b><span>さわって たべると<br>HPかいふく</span></li>
       <li><canvas id="ic-rabbit" width="72" height="72"></canvas><b>うさぎ・リス</b><span>さわると<br>スピードアップ!</span></li>
       <li class="gold"><canvas id="ic-gold" width="72" height="72"></canvas><b>金色のキノコ</b><span>走ってにげる! たおすと<br>10びょう ゴールドパワー</span></li>
+      <li class="boss-l"><canvas id="ic-boss" width="72" height="72"></canvas><b>キノコおやかた</b><span>のこり1ぷんで とうじょう<br>かさを あげたら ねらえ!</span></li>
+      <li><canvas id="ic-crate" width="72" height="72"></canvas><b>武器の箱</b><span>ひろうと しばらく<br>みずでっぽうが かわる</span></li>
       <li><canvas id="ic-map" width="72" height="72"></canvas><b>ミニマップ</b><span>むらさきの点が どくキノコ<br>あかい点が てき</span></li>
       <li class="enemy"><canvas id="ic-gorilla" width="72" height="72"></canvas><canvas id="ic-bear" width="72" height="72"></canvas><canvas id="ic-boar" width="72" height="72"></canvas><b>ゴリラ・クマ・イノシシ</b><span>こうげきされると ダメージ!<br>インクで おいはらおう</span></li>
     </ul>
@@ -283,7 +326,8 @@ body.touch #touchHints.show { display: block; }
       <div class="touch-only"><b>スマホ</b> 左がわ ドラッグ: うごく ・ 右がわ ドラッグ: ねらって うつ</div>
     </div>
     <button id="btnStart" class="big-btn">あそぶ!</button>
-    <div class="best">ハイスコア <b id="bestTitle">0</b></div>
+    <div class="best">ハイスコア <b id="bestTitle">0</b> <span class="today" id="todayForest"></span></div>
+    <ol class="hiscores" id="hiscores"></ol>
   </div>
 </div>
 
@@ -1886,6 +1930,76 @@ const Art = (() => {
     for (let i = 0; i < 3; i++) { const a = t * 3 + (i * TAU) / 3; star(g, Math.cos(a) * 26, -24 + Math.sin(a * 1.3) * 16, 3.5 + Math.sin(t * 9 + i) * 1.2, a, '#fff6a8', 0); }
   }
 
+  // ---------- 武器の箱 ----------
+  function drawCrate(g, c, t) {
+    const bob = Math.sin(t * 3 + c.t) * 2;
+    softShadow(g, 20, 8, 0.4, 0, 2);
+    g.save(); g.translate(0, -bob);
+    const col = { spread: '#ff9d2e', charge: '#4fc3ff', bubble: '#9be0ff' }[c.w];
+    g.save(); g.globalAlpha = 0.5 + Math.sin(t * 5) * 0.2; blit(g, S.glowGold, 0, -14, 0.7); g.restore();
+    rrect(g, -16, -30, 32, 28, 4, '#c9955c', 2.4);
+    g.fillStyle = 'rgba(80,40,10,0.25)'; g.fillRect(-16, -16, 32, 3); g.fillRect(-2, -30, 3, 28);
+    g.strokeStyle = '#7a4a2a'; g.lineWidth = 1.6; g.strokeRect(-12, -26, 24, 20);
+    rrect(g, -18, -32, 36, 7, 3, col, 2.2);
+    g.fillStyle = '#fff'; g.font = '800 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 3; g.strokeStyle = OUT; g.strokeText('?', 0, -15); g.fillStyle = col; g.fillText('?', 0, -15);
+    g.restore();
+    for (let i = 0; i < 2; i++) { const a = t * 2.5 + i * Math.PI; star(g, Math.cos(a) * 22, -18 + Math.sin(a * 1.4) * 8, 3, a, '#fff6a8', 0); }
+  }
+
+  // ---------- ボス「キノコおやかた」 ----------
+  function drawBoss(g, B, t) {
+    const sc = 3.1;
+    const weak = B.weak > 0;
+    const wob = B.wob > 0 ? Math.sin(t * 30) * 0.08 : 0;
+    const breath = Math.sin(t * 1.6) * 0.02;
+    const intro = B.intro > 0 ? clamp(1 - B.intro / 2.2, 0, 1) : 1;
+    const rise = (1 - intro) * 60;
+    softShadow(g, 70 * intro, 24 * intro, 0.5, 0, 6);
+    g.save(); g.translate(0, rise); g.scale(sc * (1 + breath), sc * (1 - breath) * intro);
+    g.rotate(wob);
+    // 足
+    for (const sx of [-1, 1]) { ell(g, sx * 9, -1, 7, 3.6, '#e9dcc0', 1.6); }
+    // 軸(太い)
+    g.beginPath(); g.moveTo(-13, 1); g.quadraticCurveTo(-15, -18, -11, -26); g.lineTo(11, -26); g.quadraticCurveTo(15, -18, 13, 1); g.quadraticCurveTo(0, 6, -13, 1); g.closePath();
+    const sg = g.createLinearGradient(-13, 0, 13, 0); sg.addColorStop(0, '#f3e9d2'); sg.addColorStop(0.5, '#fff8e8'); sg.addColorStop(1, '#cdbfa0');
+    fillStroke(g, sg, 1.6);
+    // 顔
+    for (const sx of [-1, 1]) {
+      ell(g, sx * 5, -14, 3.2, 3.8, '#fff', 1.2); circ(g, sx * 4.6, -13.4, 1.9, OUT, 0); circ(g, sx * 4.2, -14.2, 0.7, '#fff', 0);
+      g.strokeStyle = OUT; g.lineWidth = 1.6; g.lineCap = 'round'; g.beginPath(); g.moveTo(sx * 9.5, -20.5); g.lineTo(sx * 2, -17.5); g.stroke();
+    }
+    g.strokeStyle = OUT; g.lineWidth = 1.3; g.beginPath();
+    if (weak) { g.moveTo(-4, -6); g.quadraticCurveTo(0, -1.5, 4, -6); g.stroke(); poly(g, [-2.5, -5.5, -1, -3, 0, -5.5], '#fff', 0.8); poly(g, [2.5, -5.5, 1, -3, 0, -5.5], '#fff', 0.8); }
+    else { g.moveTo(-5, -5); g.lineTo(-2, -7); g.lineTo(0, -5); g.lineTo(2, -7); g.lineTo(5, -5); g.stroke(); }
+    // ひげ
+    g.strokeStyle = '#8a7a60'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-3, -9.5); g.quadraticCurveTo(-7, -11, -9, -8); g.moveTo(3, -9.5); g.quadraticCurveTo(7, -11, 9, -8); g.stroke();
+    // かさ(弱点のときは持ち上がって裏が見える)
+    const lift = weak ? 9 + Math.sin(t * 6) * 1.2 : 0;
+    g.save(); g.translate(0, -lift);
+    ell(g, 0, -25, 30, 7, weak ? '#ff6fb0' : '#5a2d80', 1.8);
+    if (weak) { // 弱点: 光る
+      g.save(); g.globalAlpha = 0.6 + Math.sin(t * 10) * 0.3; blit(g, S.glowGold, 0, -25, 0.45); g.restore();
+      ell(g, 0, -25, 26, 5, '#ffe14d', 1.4); g.fillStyle = '#ff3d9a'; g.beginPath(); g.arc(0, -25, 5, 0, TAU); g.fill();
+      g.strokeStyle = '#7a2d60'; g.lineWidth = 0.8; for (let i = -22; i <= 22; i += 5.5) { g.beginPath(); g.moveTo(i, -28); g.lineTo(i * 0.9, -22); g.stroke(); }
+    }
+    g.beginPath(); g.moveTo(-30, -25); g.quadraticCurveTo(-34, -66, 0, -68); g.quadraticCurveTo(34, -66, 30, -25); g.quadraticCurveTo(0, -16, -30, -25); g.closePath();
+    const cg = g.createLinearGradient(-26, -68, 24, -20); cg.addColorStop(0, '#b56cff'); cg.addColorStop(0.45, '#8a3fd0'); cg.addColorStop(1, '#4a1a7a');
+    fillStroke(g, cg, 2);
+    g.save(); g.clip();
+    g.fillStyle = 'rgba(255,255,255,0.22)'; g.beginPath(); g.ellipse(-12, -54, 10, 5, -0.5, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(20,0,50,0.3)'; g.beginPath(); g.ellipse(14, -28, 24, 14, 0, 0, TAU); g.fill();
+    g.restore();
+    for (const [x, y, r] of [[-14, -46, 5.5], [8, -58, 4.5], [18, -38, 5], [-2, -34, 3.5], [-22, -34, 3.2], [6, -44, 3]]) circ(g, x, y, r, '#ffe94d', 1.2);
+    // 王冠
+    poly(g, [-9, -66, -6, -76, -3, -68, 0, -79, 3, -68, 6, -76, 9, -66], '#ffd23f', 1.4);
+    circ(g, -6, -75, 1.4, '#ff3d9a', 0); circ(g, 6, -75, 1.4, '#4fc3ff', 0); circ(g, 0, -78, 1.6, '#9dffb0', 0);
+    g.restore();
+    g.restore();
+    // 胞子・いかり
+    if (B.flash > 0) { g.save(); g.globalAlpha = B.flash * 4; g.globalCompositeOperation = 'lighter'; circ(g, 0, -130, 80, 'rgba(255,255,255,0.4)', 0); g.restore(); }
+  }
+
   // ---------- 橋 ----------
   function drawBridge(g, b) {
     g.save(); g.translate(b.x, b.y); g.rotate(b.ang);
@@ -1930,6 +2044,8 @@ const Art = (() => {
     const fake = { x: 0, y: 0, face: 1, t: 0.4, st: 0, dur: 1, hp: 1, maxHp: 1, state: 'wander', moving: false, hopU: 0, atk: '' };
     if (what === 'poison') blit(g, S.mush.poison[0], 0, 0);
     else if (what === 'good') blit(g, S.mush.good[0], 0, 0);
+    else if (what === 'boss') { g.scale(0.36, 0.36); g.translate(0, 0); drawBoss(g, { weak: 1, wob: 0, intro: 0, flash: 0 }, 0.5); }
+    else if (what === 'crate') { g.scale(1.3, 1.3); drawCrate(g, { w: 'charge', t: 0 }, 0.4); }
     else if (what === 'gold') { g.scale(0.9, 0.9); drawGold(g, { moving: true, runT: 1.2, face: 1, hitT: 0 }, 0.4); }
     else if (what === 'rabbit') { g.scale(1.5, 1.5); drawRabbit(g, fake, 0); }
     else if (what === 'squirrel') { g.scale(1.5, 1.5); drawSquirrel(g, fake, 0); }
@@ -1940,7 +2056,7 @@ const Art = (() => {
     g.restore();
   }
 
-  return { OUT, INK, S, init, blit, mk, drawBoy, drawBoar, drawBear, drawGorilla, drawRabbit, drawSquirrel, drawGold, drawBridge, drawIcon, star, ell, circ, poly, rrect, shadow, TREE_COL };
+  return { OUT, INK, S, init, blit, mk, drawBoy, drawBoar, drawBear, drawGorilla, drawRabbit, drawSquirrel, drawGold, drawCrate, drawBoss, drawBridge, drawIcon, star, ell, circ, poly, rrect, shadow, TREE_COL };
 })();
 
 /* ---- js/audio.js ---- */
@@ -2039,6 +2155,16 @@ const Sound = (() => {
       tone(60, 0.6, 'sine', 0.25, 30); noise(0.5, 0.12, 900, 'lowpass');
       [2093, 2637].forEach((f, i) => tone(f, 0.5, 'sine', 0.06, null, 0.45 + i * 0.1));
     },
+    alarm() { for (let i = 0; i < 3; i++) { tone(660, 0.16, 'square', 0.07, null, i * 0.24); tone(520, 0.16, 'square', 0.07, null, i * 0.24 + 0.12); } },
+    clear() { [523, 659, 784, 1047, 1319].forEach((f, i) => { tone(f, 0.25, 'triangle', 0.1, null, i * 0.08); }); tone(1568, 0.6, 'sine', 0.07, null, 0.45); },
+    pickup() { [880, 1175, 1760].forEach((f, i) => tone(f, 0.12, 'square', 0.05, null, i * 0.06)); },
+    bubble() { tone(600, 0.12, 'sine', 0.07, 900); },
+    charged() { tone(1200, 0.1, 'sine', 0.06, 1800); tone(1800, 0.12, 'sine', 0.04, null, 0.08); },
+    beam() { noise(0.25, 0.14, 1800, 'highpass'); tone(300, 0.3, 'sawtooth', 0.1, 90); tone(1400, 0.2, 'sine', 0.06, 400); },
+    mission() { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.18, 'triangle', 0.09, null, i * 0.07)); },
+    bossRoar() { noise(0.9, 0.16, 400, 'lowpass'); tone(70, 0.9, 'sawtooth', 0.14, 40); tone(140, 0.6, 'square', 0.05, 60, 0.1); },
+    spore() { for (let i = 0; i < 4; i++) tone(500 + i * 90, 0.08, 'sine', 0.05, 300, i * 0.05); },
+    bossDown() { [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => { tone(f, 0.35, 'triangle', 0.1, null, i * 0.09); tone(f * 2, 0.3, 'sine', 0.05, null, i * 0.09); }); noise(0.6, 0.12, 1200, 'lowpass'); tone(50, 0.8, 'sine', 0.25, 30); },
     powerEnd() { [784, 659, 523].forEach((f, i) => tone(f, 0.2, 'triangle', 0.08, null, i * 0.12)); },
   };
 
@@ -2462,6 +2588,7 @@ function resetGame() {
   const sp = G.world.randomSpot(Math.random, (x, y) => Math.hypot(x - G.player.x, y - G.player.y) < 260 && Math.hypot(x - G.player.x, y - G.player.y) > 140);
   if (sp) { near.x = sp.x; near.y = sp.y; }
   for (let i = 0; i < CONFIG.director.start; i++) spawnEnemy(true);
+  Features.reset();
 }
 
 // ---------- スコア ----------
@@ -2516,7 +2643,8 @@ function updatePlayer(dt) {
   }
 
   let mv = playing ? Input.move() : { x: 0, y: 0 };
-  let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1);
+  let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1) * Features.playerSpeedMul();
+  if (G.weapon === 'charge' && G.charge > 0) speed *= 0.55; // ためている間は足がおそい
   const tx = mv.x * speed;
   const ty = mv.y * speed;
   P.vx = approach(P.vx, tx, C.accel * dt);
@@ -2555,8 +2683,9 @@ function updatePlayer(dt) {
   P.aim = a.angle;
   P.face = Math.cos(P.aim) >= 0 ? 1 : -1;
   P.firing = a.fire && playing;
-  if (P.firing && P.fireCd <= 0) {
-    shoot(P, a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim);
+  const aimA = (P.firing || G.charge > 0) ? (a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim) : P.aim;
+  if (!Features.weaponFire(P, aimA, dt) && P.firing && P.fireCd <= 0) {
+    shoot(P, aimA);
     P.fireCd = 1 / (G.power > 0 ? CONFIG.power.rate : CONFIG.gun.rate);
   }
   // ブースト中のスピード線
@@ -2614,24 +2743,40 @@ function updateProjectiles(dt) {
     p.life -= dt;
     p.t += dt;
     if (p.homing) homeProjectile(p, dt);
+    if (p.bubble) { p.ph += dt * 6; p.x += Math.cos(p.ph) * 30 * dt; p.y += Math.sin(p.ph) * 20 * dt; p.vx *= Math.exp(-0.5 * dt); p.vy *= Math.exp(-0.5 * dt); }
     p.x += p.vx * dt; p.y += p.vy * dt;
     p.dropT += Math.hypot(p.vx, p.vy) * dt;
-    p.h = Math.max(4, p.h - dt * 14);
+    if (!p.bubble) p.h = Math.max(4, p.h - dt * 14);
     if (p.dropT > 140) { p.dropT = 0; addDecal(p.x + rr(-5, 5), p.y + rr(-5, 5), 0.34, 'drop', 6); }
     let dead = p.life <= 0;
     let hitKind = null;
     if (!dead) {
       // 草むらに隠れたキノコにも当たる
+      const extra = p.hr || 0;
       for (const m of G.mushrooms) {
         if (m.dead || m.type === 'good') continue;
-        if (Math.hypot(m.x - p.x, m.y - p.y) < m.hr) { hitMushroom(m, p); dead = true; hitKind = 'mushroom'; break; }
+        if (Math.hypot(m.x - p.x, m.y - p.y) < m.hr + extra) {
+          if (p.pierce) { if (!p.hit.has(m)) { p.hit.add(m); hitMushroom(m, p); } continue; }
+          if (p.bubble) { dead = true; hitKind = 'bubble'; break; }
+          hitMushroom(m, p); dead = true; hitKind = 'mushroom'; break;
+        }
       }
     }
     if (!dead) {
+      const extra = p.hr || 0;
       for (const e of G.enemies) {
         if (e.state === 'flee') continue;
-        if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.hr) { hitEnemy(e, p); dead = true; hitKind = 'enemy'; break; }
+        if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.hr + extra) {
+          if (p.pierce) { if (!p.hit.has(e)) { p.hit.add(e); hitEnemy(e, p); } continue; }
+          if (p.bubble) { dead = true; hitKind = 'bubble'; break; }
+          hitEnemy(e, p); dead = true; hitKind = 'enemy'; break;
+        }
       }
+    }
+    if (!dead && G.boss && !G.boss.dead && Math.hypot(G.boss.x - p.x, G.boss.y - 30 - p.y) < G.boss.hr + (p.hr || 0)) {
+      if (p.pierce) { if (!p.hit.has(G.boss)) { p.hit.add(G.boss); Features.hitBoss(p); } }
+      else if (p.bubble) { dead = true; hitKind = 'bubble'; }
+      else { Features.hitBoss(p); dead = true; hitKind = 'enemy'; }
     }
     if (!dead) {
       W.hash.query(p.x - 4, p.y - 4, p.x + 4, p.y + 4, (o) => {
@@ -2640,6 +2785,7 @@ function updateProjectiles(dt) {
         if (Math.hypot(o.x - p.x, o.y - p.y) < o.r + 2) { dead = true; hitKind = 'wall'; }
       });
     }
+    if (dead && p.bubble) { Features.bubbleBurst(p); hitKind = 'bubble'; }
     if (dead) {
       if (!hitKind || hitKind === 'wall') {
         if (W.tileAt(p.x, p.y) === T_WATER) {
@@ -2714,6 +2860,7 @@ function purify(m) {
   G.cam.shake = Math.max(G.cam.shake, big ? 7 : 4);
   G.hitStop = Math.max(G.hitStop, big ? 0.1 : 0.055);
   Sound.sfx.pop(G.combo);
+  Features.onPurify(m);
   if (gold) { G.gold = null; G.goldT = CONFIG.mushroom.goldEvery; G.stats.gold += 1; activatePower(); }
 }
 
@@ -2863,7 +3010,8 @@ function updateEnemy(e, dt) {
       e.wanderT -= dt;
       if (e.wanderT <= 0 || Math.hypot(e.tx - e.x, e.ty - e.y) < 14 || e.stuckT > 1.2) {
         // 森の動物はプレイヤーの気配に引かれて、少しずつ近づいてくる
-        if (alive && d < 1500) { e.homeX += (P.x - e.homeX) * 0.3; e.homeY += (P.y - e.homeY) * 0.3; }
+        if (G.ev && Math.hypot(G.ev.x - e.x, G.ev.y - e.y) < 1100) { e.homeX += (G.ev.x - e.homeX) * 0.5; e.homeY += (G.ev.y - e.homeY) * 0.5; }
+        else if (alive && d < 1500) { e.homeX += (P.x - e.homeX) * 0.3; e.homeY += (P.y - e.homeY) * 0.3; }
         const a = Math.random() * TAU;
         const r = rr(80, 260);
         e.tx = e.homeX + Math.cos(a) * r; e.ty = e.homeY + Math.sin(a) * r;
@@ -3006,6 +3154,7 @@ function updateCritter(c, dt) {
     return;
   }
   c.t += dt;
+  if (c.follow > 0) { Features.updateCompanion(c, dt); return; }
   const dx = P.x - c.x;
   const dy = P.y - c.y;
   const d = Math.hypot(dx, dy);
@@ -3027,7 +3176,7 @@ function collectCritter(c) {
   const C = CONFIG.player;
   P.boostT = Math.min(P.boostT + C.boostTime, C.boostMax);
   G.stats.boosts += 1;
-  c.gone = true; c.respawn = rr(6, 10);
+  if (!Features.recruit(c)) { c.gone = true; c.respawn = rr(6, 10); }
   floatText(c.x, c.y - 40, 'スピードアップ!', '#ffe14d', 22);
   burst(c.x, c.y - 14, 16, { s0: 50, s1: 150, l0: 0.4, l1: 0.8, z0: 3, z1: 6, color: ['#ffe14d', '#fff6a8', '#ffffff'], shape: 'spark' });
   ring(c.x, c.y - 4, 6, 50, 0.4, 'rgba(255,230,90,0.9)', 4);
@@ -3196,7 +3345,7 @@ function updateAmbientFx(dt) {
       x: V.left + Math.random() * V.vw, y: V.top - 40 + (leaf ? 0 : Math.random() * (V.vh + 40)),
       vx: leaf ? rr(14, 36) : rr(-6, 6), vy: leaf ? rr(22, 44) : rr(-5, 5), leaf,
       life: leaf ? rr(5, 9) : rr(3, 6), max: 0, size: leaf ? rr(4, 7) : rr(1.5, 3), ph: Math.random() * TAU, rot: Math.random() * TAU, vr: rr(-2.5, 2.5),
-      color: leaf ? ['#c9d651', '#e4a84a', '#8fc24d', '#d97b3a'][Math.floor(Math.random() * 4)] : 'rgba(255,250,200,0.9)',
+      color: leaf ? ['#c9d651', '#e4a84a', '#8fc24d', '#d97b3a'][Math.floor(Math.random() * 4)] : (G.night > 0.3 ? '#d4ff5a' : 'rgba(255,250,200,0.9)'), firefly: !leaf && G.night > 0.3,
     });
     list[list.length - 1].max = list[list.length - 1].life;
   }
@@ -3233,7 +3382,7 @@ function updateGame(dt) {
   for (const m of G.mushrooms) updateMushroom(m, dt);
   updateParticles(dt);
   updateAmbientFx(dt);
-  if (playing) updateDirector(dt);
+  if (playing) { updateDirector(dt); Features.update(dt); }
 }
 
 // タイトル画面の背景: 動物とパーティクルだけ動かす
@@ -3246,6 +3395,424 @@ function updateAmbient(dt) {
 }
 
 if (typeof module !== 'undefined' && module.exports) module.exports = { rr };
+
+/* ---- js/features.js ---- */
+'use strict';
+/* 追加の遊び: どくの大発生(ウェーブ)・武器の箱・ボス「キノコおやかた」・ミッション・仲間のどうぶつ・夕方から夜
+   entities.js / render.js / main.js から Features.* を呼ぶ。状態は G.ev / G.crates / G.boss / G.missions に持つ */
+
+const Features = (() => {
+  const C = {
+    outbreak: { first: 30, every: 48, limit: 42, r0: 70, r1: 250, count: 11, max: 22, addEvery: 5, bonus: 1200, taintSlow: 0.7, taintLife: 35 },
+    crate: { first: 12, every: 24, max: 2, time: 15 },
+    weapons: {
+      spread: { name: 'スプレッド', color: '#ff9d2e', rate: 6.5, n: 3, arc: 0.24 },
+      charge: { name: 'チャージ', color: '#4fc3ff', need: 0.55, speed: 920, range: 620, dmg: 3, hr: 18 },
+      bubble: { name: 'バブル', color: '#9be0ff', rate: 3.2, speed: 240, life: 1.7, splash: 85, dmg: 1 },
+    },
+    boss: { at: 62, hp: 46, cr: 48, hr: 72, speed: 42, weakEvery: 7, weakTime: 2.6, weakMul: 3, sporeEvery: 4.5, spores: 5, cloudEvery: 10, cloudR: 170, cloudTime: 3.2, score: 3000 },
+    mission: { bonusTime: 12, bonusScore: 300 },
+    companion: { time: 14, max: 2, seek: 280, hitEvery: 1.1 },
+    night: { eveStart: 55, nightStart: 120, nightFull: 165 },
+  };
+  const rr = (a, b) => a + Math.random() * (b - a);
+
+  // ================= リセット =================
+  function reset() {
+    G.ev = null; G.evT = C.outbreak.first; G.taints = [];
+    G.crates = []; G.crateT = C.crate.first;
+    G.boss = null; G.spores = []; G.bossDone = false;
+    G.missions = { cur: null, done: 0, list: [], flash: 0 };
+    G.companions = 0;
+    G.weapon = null; G.weaponT = 0; G.charge = 0; G.wasFiring = false;
+    G.night = 0; G.eve = 0;
+    G.stats.outbreaks = 0; G.stats.outbreaksCleared = 0; G.stats.missions = 0; G.stats.boss = 0; G.stats.crates = 0;
+    nextMission();
+  }
+
+  // ================= どくの大発生 =================
+  function startOutbreak() {
+    const W = G.world;
+    const P = G.player;
+    const s = W.randomSpot(Math.random, (x, y) => { const d = Math.hypot(x - P.x, y - P.y); return d > 520 && d < 900; }, 60);
+    if (!s) return false;
+    const ev = { x: s.x, y: s.y, t: 0, r: C.outbreak.r0, left: C.outbreak.limit, mush: [], addT: 0, total: 0 };
+    G.ev = ev;
+    G.stats.outbreaks += 1;
+    for (let i = 0; i < C.outbreak.count; i++) addOutbreakMushroom(ev);
+    UI.banner('どくの大発生!');
+    UI.toast('どくキノコが 大発生! ' + C.outbreak.limit + 'びょう以内に ぜんぶ きれいにしよう', 3600);
+    Sound.sfx.alarm();
+    return true;
+  }
+  function addOutbreakMushroom(ev) {
+    const W = G.world;
+    for (let tries = 0; tries < 24; tries++) {
+      const a = Math.random() * TAU; const d = Math.sqrt(Math.random()) * ev.r * 0.95;
+      const x = ev.x + Math.cos(a) * d; const y = ev.y + Math.sin(a) * d * 0.85;
+      if (!W.isOpen(x, y, 16) || nearAnyMushroom(x, y, 24)) continue;
+      const m = makeMushroom('poison', x, y, ev.total % 7 === 6);
+      m.hidden = false; m.ev = ev; m.pop = 0;
+      G.mushrooms.push(m); ev.mush.push(m); ev.total += 1;
+      burst(x, y - 10, 5, { s0: 20, s1: 70, l0: 0.4, l1: 0.8, z0: 2, z1: 4, color: ['#c35cff', '#8a2be2'], shape: 'bubble', ay: -40 });
+      return;
+    }
+  }
+  function updateOutbreak(dt) {
+    const ev = G.ev;
+    if (!ev) {
+      G.evT -= dt;
+      if (G.evT <= 0 && !G.boss) { if (!startOutbreak()) G.evT = 4; else G.evT = C.outbreak.every; }
+      return;
+    }
+    ev.t += dt; ev.left -= dt;
+    ev.r = lerp(C.outbreak.r0, C.outbreak.r1, clamp(ev.t / C.outbreak.limit, 0, 1));
+    ev.addT -= dt;
+    if (ev.addT <= 0 && ev.total < C.outbreak.max) { ev.addT = C.outbreak.addEvery; addOutbreakMushroom(ev); }
+    ev.mush = ev.mush.filter((m) => !m.dead);
+    const alive = ev.mush.length;
+    if (alive === 0 && ev.t > 0.5) {
+      // せいこう
+      const pts = Math.round(C.outbreak.bonus * scoreMul());
+      G.score += pts; G.stats.outbreaksCleared += 1;
+      floatText(ev.x, ev.y - 40, '森を すくった! +' + pts, '#9dffb0', 30);
+      UI.banner('森を すくった!');
+      ring(ev.x, ev.y, 20, ev.r + 80, 0.9, 'rgba(180,255,180,0.9)', 8);
+      burst(ev.x, ev.y - 20, 40, { s0: 60, s1: 260, l0: 0.6, l1: 1.3, z0: 3, z1: 8, color: ['#9dffb0', '#fff6a8', '#ff9ad0', '#fff'], shape: 'spark', drag: 1.2 });
+      for (let i = 0; i < 14; i++) { const a = Math.random() * TAU; const d = Math.sqrt(Math.random()) * ev.r; addDecal(ev.x + Math.cos(a) * d, ev.y + Math.sin(a) * d * 0.85, rr(0.8, 1.3), 'flower', 40); }
+      Sound.sfx.clear();
+      G.ev = null; G.evT = C.outbreak.every;
+      return;
+    }
+    if (ev.left <= 0) {
+      // 間に合わなかった: 汚染が残る
+      UI.toast('汚染が ひろがってしまった… むらさきの地面は 足が おそくなる', 3600);
+      G.taints.push({ x: ev.x, y: ev.y, r: ev.r, life: C.outbreak.taintLife });
+      for (const m of ev.mush) m.ev = null;
+      G.ev = null; G.evT = C.outbreak.every * 0.8;
+      Sound.sfx.poison();
+      return;
+    }
+    // 胞子がただよう
+    if (Math.random() < dt * 10) addParticle({ x: ev.x + rr(-ev.r, ev.r), y: ev.y + rr(-ev.r, ev.r) * 0.85, vx: rr(-8, 8), vy: -rr(8, 20), ay: 0, drag: 0, life: rr(1.2, 2.4), max: 2.4, size: rr(2, 4), color: '#b04cff', shape: 'bubble', rot: 0, vr: 0, grow: 0 });
+  }
+  function inTaint(x, y) {
+    if (G.ev) { const dx = x - G.ev.x; const dy = (y - G.ev.y) / 0.85; if (dx * dx + dy * dy < G.ev.r * G.ev.r) return true; }
+    for (const t of G.taints) { const dx = x - t.x; const dy = (y - t.y) / 0.85; if (dx * dx + dy * dy < t.r * t.r) return true; }
+    return false;
+  }
+  function playerSpeedMul() {
+    const P = G.player;
+    if (G.power > 0) return 1;
+    return inTaint(P.x, P.y) ? C.outbreak.taintSlow : 1;
+  }
+
+  // ================= 武器の箱 =================
+  function spawnCrate() {
+    const P = G.player;
+    const s = G.world.randomSpot(Math.random, (x, y) => { const d = Math.hypot(x - P.x, y - P.y); return d > 280 && d < 700; }, 30);
+    if (!s) return false;
+    const keys = Object.keys(C.weapons);
+    G.crates.push({ kind: 'crate', x: s.x, y: s.y, t: 0, w: keys[Math.floor(Math.random() * keys.length)], life: 40 });
+    return true;
+  }
+  function updateCrates(dt) {
+    G.crateT -= dt;
+    if (G.crateT <= 0 && G.crates.length < C.crate.max) { G.crateT = spawnCrate() ? C.crate.every : 3; }
+    const P = G.player;
+    const keep = [];
+    for (const c of G.crates) {
+      c.t += dt; c.life -= dt;
+      if (c.life <= 0) continue;
+      if (G.state === 'playing' && Math.hypot(c.x - P.x, c.y - P.y) < P.r + 20) { pickCrate(c); continue; }
+      keep.push(c);
+    }
+    G.crates = keep;
+    if (G.weapon) {
+      G.weaponT -= dt;
+      if (G.weaponT <= 0) { G.weapon = null; G.charge = 0; UI.toast('ふつうの みずでっぽうに もどった'); }
+    }
+  }
+  function pickCrate(c) {
+    const w = C.weapons[c.w];
+    G.weapon = c.w; G.weaponT = C.crate.time; G.charge = 0;
+    G.stats.crates += 1;
+    floatText(c.x, c.y - 40, w.name + '!', w.color, 26);
+    const tip = c.w === 'spread' ? '3方向に ひろがる' : c.w === 'charge' ? 'おしっぱなしで ためて はなすと つらぬく' : 'ふわふわ とんで ひろく はじける';
+    UI.toast(w.name + ' ゲット! ' + tip, 3400);
+    burst(c.x, c.y - 16, 20, { s0: 50, s1: 170, l0: 0.4, l1: 0.9, z0: 3, z1: 6, color: [w.color, '#fff', '#fff6a8'], shape: 'spark' });
+    ring(c.x, c.y - 4, 6, 60, 0.4, w.color, 4);
+    Sound.sfx.pickup();
+  }
+  // 発射を引き受ける。true を返したら通常の発射はしない
+  function weaponFire(P, aim, dt) {
+    if (!G.weapon) { G.wasFiring = P.firing; return false; }
+    const g = CONFIG.gun;
+    const w = C.weapons[G.weapon];
+    const power = G.power > 0;
+    if (G.weapon === 'spread') {
+      if (P.firing && P.fireCd <= 0) {
+        for (let i = 0; i < w.n; i++) {
+          const a = aim + (i - (w.n - 1) / 2) * w.arc + (Math.random() - 0.5) * 0.04;
+          const sp = g.speed * rr(0.95, 1.05);
+          G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: (g.range * 0.9) / g.speed, dropT: 0, h: 22, dmg: power ? CONFIG.power.damage : 1, gold: power, homing: power, t: 0 });
+        }
+        muzzle(P, aim, w.color, 14);
+        P.recoil = 1; P.fireCd = 1 / (power ? CONFIG.power.rate : w.rate);
+        Sound.sfx.shoot(power);
+      }
+    } else if (G.weapon === 'bubble') {
+      if (P.firing && P.fireCd <= 0) {
+        const a = aim + (Math.random() - 0.5) * 0.1;
+        G.proj.push({ x: P.x + Math.cos(a) * 26, y: P.y + Math.sin(a) * 26, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: w.life, dropT: 0, h: 30, dmg: w.dmg + (power ? 1 : 0), gold: power, homing: power, t: 0, bubble: true, hr: 20, ph: Math.random() * TAU });
+        muzzle(P, aim, w.color, 12);
+        P.recoil = 0.6; P.fireCd = 1 / w.rate;
+        Sound.sfx.bubble();
+      }
+    } else if (G.weapon === 'charge') {
+      if (P.firing) {
+        G.charge = Math.min(G.charge + dt, w.need + 0.4);
+        if (Math.random() < dt * 30) addParticle({ x: P.x + Math.cos(aim) * 30 + rr(-14, 14), y: P.y - 20 + Math.sin(aim) * 30 + rr(-14, 14), vx: -Math.cos(aim) * 40, vy: -Math.sin(aim) * 40, ay: 0, drag: 4, life: 0.3, max: 0.3, size: rr(2, 4), color: w.color, shape: 'spark', rot: 0, vr: 6, grow: 0 });
+        if (G.charge >= w.need && G.charge - dt < w.need) Sound.sfx.charged();
+      } else if (G.wasFiring && G.charge > 0) {
+        if (G.charge >= w.need) {
+          const a = aim;
+          G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: w.range / w.speed, dropT: 0, h: 20, dmg: w.dmg + (power ? 1 : 0), gold: power, homing: false, t: 0, pierce: true, hit: new Set(), hr: w.hr });
+          muzzle(P, a, w.color, 26);
+          P.recoil = 1.6;
+          G.cam.kx -= Math.cos(a) * 16; G.cam.ky -= Math.sin(a) * 16; G.cam.shake = Math.max(G.cam.shake, 5);
+          Sound.sfx.beam();
+        } else { Sound.sfx.click(); }
+        G.charge = 0;
+      }
+    }
+    G.wasFiring = P.firing;
+    return true;
+  }
+  function muzzle(P, a, color, size) {
+    const mx = P.x + Math.cos(a) * 30; const my = P.y - 20 + Math.sin(a) * 30;
+    addParticle({ x: mx, y: my, vx: 0, vy: 0, ay: 0, drag: 0, life: 0.07, max: 0.07, size, color, shape: 'flash', rot: a, vr: 0, grow: 0 });
+    G.cam.kx -= Math.cos(a) * 4; G.cam.ky -= Math.sin(a) * 4;
+  }
+  // バブルがはじけたとき: まわりにまとめてダメージ
+  function bubbleBurst(p) {
+    const w = C.weapons.bubble;
+    ring(p.x, p.y - 8, 10, w.splash, 0.35, 'rgba(160,225,255,0.9)', 5);
+    burst(p.x, p.y - 8, 16, { s0: 40, s1: 160, l0: 0.3, l1: 0.6, z0: 2, z1: 5, color: ['#9be0ff', '#ff9ad0', '#fff'], shape: 'ink', ay: 250 });
+    addDecal(p.x, p.y, 1.4, p.gold ? 'gsplat' : 'splat', 14);
+    for (const m of G.mushrooms) { if (m.dead || m.type === 'good') continue; if (Math.hypot(m.x - p.x, m.y - p.y) < w.splash + m.hr) hitMushroom(m, { x: m.x, y: m.y - 10, vx: (m.x - p.x) * 3, vy: (m.y - p.y) * 3, dmg: p.dmg, gold: p.gold }); }
+    for (const e of G.enemies) { if (e.state === 'flee') continue; if (Math.hypot(e.x - p.x, e.y - p.y) < w.splash + e.def.hr) hitEnemy(e, { x: e.x, y: e.y - 10, vx: (e.x - p.x) * 3, vy: (e.y - p.y) * 3, dmg: p.dmg, gold: p.gold }); }
+    if (G.boss && Math.hypot(G.boss.x - p.x, G.boss.y - p.y) < w.splash + C.boss.hr) hitBoss({ x: p.x, y: p.y, vx: 0, vy: 0, dmg: p.dmg, gold: p.gold });
+    Sound.sfx.pop(0);
+  }
+
+  // ================= ボス「キノコおやかた」 =================
+  function spawnBoss() {
+    const P = G.player;
+    const s = G.world.randomSpot(Math.random, (x, y) => { const d = Math.hypot(x - P.x, y - P.y); return d > 420 && d < 700; }, 80);
+    if (!s) return false;
+    const b = { kind: 'boss', x: s.x, y: s.y, hp: C.boss.hp, maxHp: C.boss.hp, t: 0, weakT: C.boss.weakEvery, weak: 0, sporeT: 2.5, cloudT: 6, cloud: 0, flash: 0, face: 1, wob: 0, hr: C.boss.hr, dead: false, intro: 2.2 };
+    G.boss = b;
+    if (G.ev) { for (const m of G.ev.mush) m.ev = null; G.ev = null; }
+    UI.banner('キノコおやかた!');
+    UI.toast('ボスが あらわれた! かさを もちあげた ときが チャンス!', 4200);
+    Sound.sfx.bossRoar();
+    G.cam.shake = Math.max(G.cam.shake, 12);
+    return true;
+  }
+  function updateBoss(dt) {
+    const B = G.boss;
+    if (!B) {
+      if (!G.bossDone && G.timeLeft <= C.boss.at && G.timeLeft > 8) { if (spawnBoss()) G.bossDone = true; }
+      return;
+    }
+    const P = G.player;
+    B.t += dt;
+    if (B.flash > 0) B.flash -= dt;
+    if (B.wob > 0) B.wob -= dt;
+    if (B.intro > 0) { B.intro -= dt; return; }
+    const dx = P.x - B.x; const dy = P.y - B.y; const d = Math.hypot(dx, dy);
+    // ゆっくり追ってくる
+    if (d > 150 && B.weak <= 0) { const a = Math.atan2(dy, dx); moveBody(B, Math.cos(a) * C.boss.speed * dt, Math.sin(a) * C.boss.speed * dt, C.boss.cr); if (Math.abs(dx) > 10) B.face = dx > 0 ? 1 : -1; }
+    // 弱点をさらす
+    if (B.weak > 0) { B.weak -= dt; if (B.weak <= 0) B.weakT = C.boss.weakEvery; }
+    else { B.weakT -= dt; if (B.weakT <= 0) { B.weak = C.boss.weakTime; floatText(B.x, B.y - 150, 'いまだ!', '#ffe14d', 30); Sound.sfx.charged(); } }
+    // 胞子
+    B.sporeT -= dt;
+    if (B.sporeT <= 0 && B.weak <= 0) {
+      B.sporeT = C.boss.sporeEvery;
+      for (let i = 0; i < C.boss.spores; i++) {
+        const a = Math.atan2(dy, dx) + (i - (C.boss.spores - 1) / 2) * 0.45 + rr(-0.1, 0.1);
+        const sp = rr(150, 230);
+        G.spores.push({ x: B.x, y: B.y - 80, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, z: 80, vz: rr(120, 200), t: 0 });
+      }
+      B.wob = 0.4;
+      Sound.sfx.spore();
+    }
+    // 毒の雲
+    if (B.cloud > 0) {
+      B.cloud -= dt;
+      if (G.state === 'playing' && d < C.boss.cloudR + P.r && G.power <= 0 && P.slowT <= 0.5) { P.slowT = 1.2; }
+      if (Math.random() < dt * 24) addParticle({ x: B.x + rr(-C.boss.cloudR, C.boss.cloudR), y: B.y + rr(-C.boss.cloudR, C.boss.cloudR) * 0.8, vx: rr(-10, 10), vy: -rr(5, 15), ay: 0, drag: 0, life: 1.2, max: 1.2, size: rr(4, 8), color: '#a24be0', shape: 'bubble', rot: 0, vr: 0, grow: 0 });
+    } else { B.cloudT -= dt; if (B.cloudT <= 0 && B.weak <= 0) { B.cloudT = C.boss.cloudEvery; B.cloud = C.boss.cloudTime; ring(B.x, B.y, 20, C.boss.cloudR, 0.6, 'rgba(170,70,230,0.8)', 8); Sound.sfx.poison(); } }
+    // 体当たりで押し返す(ダメージはない: 毒の雲と子キノコで攻める)
+    const min = C.boss.cr + P.r;
+    if (d < min && d > 0.1) { const k = (min - d); moveBody(P, (dx / d) * k, (dy / d) * k, P.r); if (G.power > 0) hitBoss({ x: P.x, y: P.y, vx: dx * 4, vy: dy * 4, dmg: 1, gold: true }); }
+  }
+  function updateSpores(dt) {
+    const keep = [];
+    for (const s of G.spores) {
+      s.t += dt;
+      s.x += s.vx * dt; s.y += s.vy * dt;
+      s.vz -= 420 * dt; s.z += s.vz * dt;
+      if (s.z <= 0) {
+        // 着地: 小さな毒キノコが生える
+        if (G.world.isOpen(s.x, s.y, 16) && !nearAnyMushroom(s.x, s.y, 26)) { const m = makeMushroom('poison', s.x, s.y, false); m.hidden = false; m.pop = 0; G.mushrooms.push(m); }
+        burst(s.x, s.y - 4, 6, { s0: 20, s1: 70, l0: 0.3, l1: 0.6, z0: 2, z1: 4, color: ['#c35cff', '#8a2be2'], shape: 'bubble', ay: -30 });
+        continue;
+      }
+      keep.push(s);
+    }
+    G.spores = keep;
+  }
+  function hitBoss(p) {
+    const B = G.boss;
+    if (!B || B.dead) return;
+    const weak = B.weak > 0;
+    const dmg = (p.dmg || 1) * (weak ? C.boss.weakMul : 1);
+    B.hp -= dmg; B.flash = 0.12; B.wob = 0.3;
+    burst(p.x, p.y - 20, weak ? 14 : 6, { dir: Math.atan2(p.vy, p.vx), spread: 2.4, s0: 50, s1: 170, l0: 0.25, l1: 0.5, z0: 2, z1: 4.5, color: p.gold ? ['#ffe14d', '#fff'] : weak ? ['#ff3d9a', '#fff', '#ffe14d'] : ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 260 });
+    if (weak) { floatText(p.x, p.y - 60, 'クリティカル! x' + C.boss.weakMul, '#ffe14d', 22); G.hitStop = Math.max(G.hitStop, 0.05); G.cam.shake = Math.max(G.cam.shake, 4); }
+    Sound.sfx.hitEnemy();
+    if (B.hp <= 0) defeatBoss();
+  }
+  function defeatBoss() {
+    const B = G.boss;
+    B.dead = true;
+    const pts = Math.round(C.boss.score * scoreMul());
+    G.score += pts; G.stats.boss = 1;
+    floatText(B.x, B.y - 120, '+' + pts, '#ffe14d', 40);
+    UI.banner('おやかた たいじ!');
+    ring(B.x, B.y, 30, 420, 1.1, 'rgba(255,230,120,0.95)', 12);
+    burst(B.x, B.y - 60, 70, { s0: 80, s1: 360, l0: 0.7, l1: 1.6, z0: 3, z1: 9, color: ['#ffe14d', '#ff9ad0', '#9dffb0', '#fff', '#c35cff'], shape: 'spark', drag: 1.2 });
+    burst(B.x, B.y - 60, 30, { s0: 60, s1: 260, l0: 0.5, l1: 1, z0: 4, z1: 9, color: ['#ff3d9a', '#c4126a'], shape: 'ink', ay: 420, drag: 1 });
+    for (let i = 0; i < 12; i++) addDecal(B.x + rr(-120, 120), B.y + rr(-60, 60), rr(1, 1.8), 'splat', 30);
+    // まわりの毒キノコもいっしょにきれいに
+    for (const m of G.mushrooms) if (!m.dead && m.type === 'poison' && Math.hypot(m.x - B.x, m.y - B.y) < 420) purify(m);
+    G.cam.shake = Math.max(G.cam.shake, 16); G.hitStop = Math.max(G.hitStop, 0.25);
+    Sound.sfx.bossDown();
+    G.timeLeft += 10; floatText(G.player.x, G.player.y - 70, 'タイム +10びょう', '#9dffb0', 24);
+    setTimeout(() => { if (G.boss === B) G.boss = null; }, 1800);
+  }
+
+  // ================= ミッション =================
+  const POOL = [
+    { id: 'p5', text: 'どくキノコを 5本 きれいに', n: 5, get: () => G.stats.purified },
+    { id: 'p8', text: 'どくキノコを 8本 きれいに', n: 8, get: () => G.stats.purified },
+    { id: 'c5', text: '5コンボ する', n: 5, get: () => G.combo, peak: true },
+    { id: 'c8', text: '8コンボ する', n: 8, get: () => G.combo, peak: true },
+    { id: 'e1', text: 'どうぶつを 1匹 おいはらう', n: 1, get: () => G.stats.inked },
+    { id: 'e2', text: 'どうぶつを 2匹 おいはらう', n: 2, get: () => G.stats.inked },
+    { id: 'b2', text: 'うさぎか リスに 2回 さわる', n: 2, get: () => G.stats.boosts },
+    { id: 'g1', text: 'ふつうのキノコを 1個 たべる', n: 1, get: () => G.stats.eaten },
+    { id: 'w1', text: '武器の箱を 1つ ひろう', n: 1, get: () => G.stats.crates },
+    { id: 'big', text: '大きな どくキノコを 1本 たおす', n: 1, get: () => G.stats.bigs || 0 },
+    { id: 'gold', text: '金色のキノコを たおす', n: 1, get: () => G.stats.gold, late: true },
+    { id: 'ob', text: '大発生を 1回 しずめる', n: 1, get: () => G.stats.outbreaksCleared, late: true },
+  ];
+  function nextMission() {
+    const M = G.missions;
+    const used = new Set(M.list);
+    let cand = POOL.filter((p) => !used.has(p.id) && (!p.late || M.done >= 2));
+    if (!cand.length) { M.cur = null; return; }
+    const p = cand[Math.floor(Math.random() * cand.length)];
+    M.list.push(p.id);
+    M.cur = { def: p, base: p.peak ? 0 : p.get(), prog: 0 };
+  }
+  function updateMissions(dt) {
+    const M = G.missions;
+    if (M.flash > 0) M.flash -= dt;
+    if (!M.cur) return;
+    const m = M.cur;
+    m.prog = m.def.peak ? Math.min(m.def.n, m.def.get()) : Math.min(m.def.n, m.def.get() - m.base);
+    if (m.prog >= m.def.n) {
+      M.done += 1; G.stats.missions += 1;
+      const pts = Math.round(C.mission.bonusScore * scoreMul());
+      G.score += pts; G.timeLeft += C.mission.bonusTime;
+      const P = G.player;
+      floatText(P.x, P.y - 70, 'ミッション クリア! +' + pts + '  タイム +' + C.mission.bonusTime + 'びょう', '#9dffb0', 24);
+      burst(P.x, P.y - 30, 18, { s0: 50, s1: 160, l0: 0.5, l1: 1, z0: 3, z1: 6, color: ['#9dffb0', '#fff6a8', '#fff'], shape: 'spark' });
+      M.flash = 1.2;
+      Sound.sfx.mission();
+      nextMission();
+    }
+  }
+
+  // ================= 仲間のどうぶつ =================
+  // さわったどうぶつは、しばらくついてきて、近くの毒キノコに体当たりしてくれる
+  function recruit(c) {
+    if (G.companions >= C.companion.max) return false;
+    c.follow = C.companion.time; c.hitT = 0; c.target = null; c.fear = false;
+    G.companions += 1;
+    floatText(c.x, c.y - 56, 'なかまに なった!', '#9dffb0', 18);
+    return true;
+  }
+  function updateCompanion(c, dt) {
+    const P = G.player;
+    c.follow -= dt;
+    if (c.follow <= 0) { c.follow = 0; c.gone = true; c.respawn = rr(8, 14); G.companions -= 1; floatText(c.x, c.y - 40, 'バイバイ!', '#fff', 16); return; }
+    if (c.hitT > 0) c.hitT -= dt;
+    // ねらう毒キノコ
+    if (!c.target || c.target.dead || Math.hypot(c.target.x - P.x, c.target.y - P.y) > C.companion.seek + 120) {
+      c.target = null; let bd = C.companion.seek;
+      for (const m of G.mushrooms) { if (m.dead || m.type !== 'poison') continue; const d = Math.hypot(m.x - P.x, m.y - P.y); if (d < bd) { bd = d; c.target = m; } }
+    }
+    const tx = c.target ? c.target.x : P.x - 34 * (P.face || 1);
+    const ty = c.target ? c.target.y : P.y + 16;
+    const dx = tx - c.x; const dy = ty - c.y; const d = Math.hypot(dx, dy);
+    if (c.hopping) {
+      c.hopU += dt / c.hopDur;
+      const v = c.hopSpeed * (Math.PI / 2) * Math.sin(Math.PI * Math.min(c.hopU, 1));
+      moveBody(c, c.dx * v * dt, c.dy * v * dt, 8);
+      if (c.hopU >= 1) { c.hopping = false; c.hopU = 0; c.rest = 0.08; }
+    } else {
+      c.rest -= dt;
+      if (c.rest <= 0 && d > 18) {
+        const a = Math.atan2(dy, dx) + rr(-0.25, 0.25);
+        c.dx = Math.cos(a); c.dy = Math.sin(a);
+        c.hopSpeed = CONFIG.critter[c.type] * (d > 200 ? 1.15 : 0.8); c.hopDur = 0.3; c.hopping = true; c.hopU = 0.001;
+        if (Math.abs(c.dx) > 0.2) c.face = c.dx > 0 ? 1 : -1;
+      }
+    }
+    if (c.target && d < c.target.hr + 10 && c.hitT <= 0) {
+      c.hitT = C.companion.hitEvery;
+      hitMushroom(c.target, { x: c.target.x, y: c.target.y - 8, vx: dx * 8, vy: dy * 8, dmg: 1, gold: false });
+      c.dx = -c.dx; c.dy = -c.dy; c.hopSpeed = 120; c.hopDur = 0.25; c.hopping = true; c.hopU = 0.001;
+    }
+  }
+
+  // ================= 夕方から夜 =================
+  function updateDaylight() {
+    const N = C.night;
+    G.eve = clamp((G.t - N.eveStart) / (N.nightStart - N.eveStart), 0, 1) * (1 - clamp((G.t - N.nightStart) / (N.nightFull - N.nightStart), 0, 1));
+    G.night = clamp((G.t - N.nightStart) / (N.nightFull - N.nightStart), 0, 1);
+    if (!G.shownHints.night && G.night > 0.3) { G.shownHints.night = true; UI.toast('夜になってきた… どくキノコが 光って 見つけやすい。でも どうぶつは 見えにくい'); }
+  }
+
+  // ================= まとめて更新 =================
+  function update(dt) {
+    updateOutbreak(dt);
+    updateCrates(dt);
+    updateBoss(dt);
+    updateSpores(dt);
+    updateMissions(dt);
+    updateDaylight();
+    G.taints = G.taints.filter((t) => (t.life -= dt) > 0);
+  }
+  function onPurify(m) { if (m.big) G.stats.bigs = (G.stats.bigs || 0) + 1; }
+
+  return { C, reset, update, weaponFire, bubbleBurst, hitBoss, recruit, updateCompanion, playerSpeedMul, inTaint, onPurify, spawnBoss, startOutbreak, spawnCrate, pickCrate };
+})();
 
 /* ---- js/render.js ---- */
 'use strict';
@@ -3471,7 +4038,7 @@ const Render = (() => {
     const wob = m.wob > 0 ? Math.sin(t * 38) * 0.16 * (m.wob / 0.3) : 0;
     const idle = Math.sin(t * 3 + m.t * 1.2) * 0.03 + (m.hitT > 0 ? -m.hitT * 1.6 : 0);
     const sc = m.size * clamp(back, 0.01, 1.3) * 1.1;
-    const glowA = 0.55 + Math.sin(t * 4 + m.t) * 0.2;
+    const glowA = Math.min(1, 0.55 + Math.sin(t * 4 + m.t) * 0.2 + (G.night || 0) * 0.45);
     ctx.save(); ctx.globalAlpha = glowA;
     Art.blit(ctx, poison ? S.glowPoison : S.glowGood, m.x, m.y - 18 * m.size, 0.62 * m.size);
     ctx.restore();
@@ -3507,10 +4074,20 @@ const Render = (() => {
     const P = G.player;
     switch (o.kind) {
       case 'mushroom': drawMushroom(ctx, o, t); break;
+      case 'crate': ctx.save(); ctx.translate(o.x, o.y); Art.drawCrate(ctx, o, t); ctx.restore(); break;
+      case 'boss': {
+        ctx.save(); ctx.translate(o.x, o.y);
+        if (o.dead) ctx.globalAlpha = Math.max(0, 1 - (t % 100) * 0); // 消えるまでそのまま
+        ctx.scale(o.face || 1, 1);
+        Art.drawBoss(ctx, o, t);
+        ctx.restore();
+        break;
+      }
       case 'critter':
         ctx.save(); ctx.translate(o.x, o.y); ctx.scale(CH, CH);
         if (o.type === 'rabbit') Art.drawRabbit(ctx, o, t); else Art.drawSquirrel(ctx, o, t);
         ctx.restore();
+        if (o.follow > 0) { ctx.save(); ctx.translate(o.x, o.y - 44 + Math.sin(t * 5) * 2); heartPath(ctx, 0, 0, 6); ctx.fillStyle = '#ff6fa0'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = OUT; ctx.stroke(); ctx.restore(); }
         break;
       case 'enemy': {
         ctx.save(); ctx.translate(o.x, o.y);
@@ -3537,6 +4114,11 @@ const Render = (() => {
         ctx.scale(sq * CH, (2 - sq) * CH);
         Art.drawBoy(ctx, o, t);
         ctx.restore();
+        if (G.weapon === 'charge' && G.charge > 0) {
+          const k = clamp(G.charge / Features.C.weapons.charge.need, 0, 1);
+          ctx.fillStyle = 'rgba(40,20,50,0.7)'; ctx.fillRect(o.x - 22, o.y - 72, 44, 7);
+          ctx.fillStyle = k >= 1 ? '#fff' : '#4fc3ff'; ctx.fillRect(o.x - 20.5, o.y - 70.5, 41 * k, 4);
+        }
         break;
       }
       default: break;
@@ -3603,6 +4185,25 @@ const Render = (() => {
       else Art.blit(ctx, S.splat[d.v], 0, 0, d.s * pop);
       ctx.restore();
     }
+  }
+
+  // ---------- 大発生・汚染・ボスの毒の雲 ----------
+  function zone(ctx, x, y, r, inner, outer) {
+    const gr = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
+    gr.addColorStop(0, inner); gr.addColorStop(1, outer);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.85, 0, 0, TAU); ctx.fill();
+  }
+  function drawZones(ctx, t) {
+    for (const z of G.taints || []) { const a = Math.min(1, z.life / 5) * 0.5; zone(ctx, z.x, z.y, z.r, `rgba(120,40,170,${a})`, 'rgba(120,40,170,0)'); }
+    const ev = G.ev;
+    if (ev) {
+      const pulse = 0.45 + Math.sin(t * 4) * 0.1;
+      zone(ctx, ev.x, ev.y, ev.r, `rgba(140,40,200,${pulse})`, 'rgba(140,40,200,0)');
+      ctx.strokeStyle = `rgba(200,90,255,${0.5 + Math.sin(t * 6) * 0.3})`; ctx.lineWidth = 3; ctx.setLineDash([12, 10]); ctx.lineDashOffset = -t * 30;
+      ctx.beginPath(); ctx.ellipse(ev.x, ev.y, ev.r, ev.r * 0.85, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const B = G.boss;
+    if (B && B.cloud > 0) { const k = Math.min(1, B.cloud / 0.6); zone(ctx, B.x, B.y, Features.C.boss.cloudR, `rgba(150,50,220,${0.5 * k})`, 'rgba(150,50,220,0)'); }
   }
 
   // ---------- 敵の攻撃予告(赤いゾーン) ----------
@@ -3691,6 +4292,7 @@ const Render = (() => {
         ctx.strokeStyle = 'rgba(60,70,20,0.45)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-a.size, 0); ctx.lineTo(a.size, 0); ctx.stroke();
         ctx.restore();
       } else {
+        if (a.firefly) { ctx.globalAlpha *= 0.5 + 0.5 * Math.sin(a.ph * 4); ctx.fillStyle = 'rgba(212,255,90,0.35)'; ctx.beginPath(); ctx.arc(a.x, a.y, a.size * 3, 0, TAU); ctx.fill(); }
         ctx.fillStyle = a.color; ctx.beginPath(); ctx.arc(a.x, a.y, a.size, 0, TAU); ctx.fill();
       }
     }
@@ -3712,7 +4314,31 @@ const Render = (() => {
 
   function drawProjectiles(ctx) {
     const S = Art.S;
+    for (const s of G.spores || []) {
+      ctx.fillStyle = 'rgba(30,60,40,0.22)'; ctx.beginPath(); ctx.ellipse(s.x, s.y, 6, 3, 0, 0, TAU); ctx.fill();
+      ctx.save(); ctx.translate(s.x, s.y - s.z); ctx.rotate(s.t * 6);
+      Art.circ(ctx, 0, 0, 7, '#a24be0', 1.8); Art.circ(ctx, -2, -2, 2.2, '#e2b0ff', 0);
+      for (let i = 0; i < 5; i++) { const a = (i / 5) * TAU; Art.circ(ctx, Math.cos(a) * 8, Math.sin(a) * 8, 2, '#c35cff', 0); }
+      ctx.restore();
+    }
     for (const p of G.proj) {
+      if (p.pierce) {
+        ctx.save(); ctx.translate(p.x, p.y - p.h); ctx.rotate(Math.atan2(p.vy, p.vx));
+        ctx.fillStyle = 'rgba(79,195,255,0.35)'; ctx.beginPath(); ctx.ellipse(-30, 0, 46, p.hr, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#9be0ff'; ctx.beginPath(); ctx.ellipse(-16, 0, 34, p.hr * 0.65, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-8, -2, 20, p.hr * 0.3, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      if (p.bubble) {
+        ctx.fillStyle = 'rgba(30,60,40,0.18)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 10, 5, 0, 0, TAU); ctx.fill();
+        const y = p.y - p.h; const r = 16 + Math.sin(p.ph * 2) * 1.5;
+        ctx.fillStyle = 'rgba(160,225,255,0.35)'; ctx.beginPath(); ctx.arc(p.x, y, r, 0, TAU); ctx.fill();
+        ctx.fillStyle = 'rgba(255,61,154,0.45)'; ctx.beginPath(); ctx.arc(p.x, y, r * 0.6, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, y, r, 0, TAU); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.ellipse(p.x - r * 0.4, y - r * 0.4, r * 0.3, r * 0.18, -0.6, 0, TAU); ctx.fill();
+        continue;
+      }
       ctx.fillStyle = 'rgba(30,60,40,0.22)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 5, 2.6, 0, 0, TAU); ctx.fill();
       ctx.lineCap = 'round';
       ctx.strokeStyle = p.gold ? 'rgba(255,225,90,0.35)' : 'rgba(255,61,154,0.28)'; ctx.lineWidth = 9;
@@ -3808,6 +4434,7 @@ const Render = (() => {
       drawPatch(ctx, p, t);
     }
     mark('patches');
+    drawZones(ctx, t);
     drawDecals(ctx, left, top, right, bottom);
     drawTelegraphs(ctx, t);
     mark('decals');
@@ -3822,11 +4449,13 @@ const Render = (() => {
     for (const m of G.mushrooms) if (!m.dead && !m.hidden && m.x > left - 80 && m.x < right + 80 && m.y > top - 60 && m.y < bottom + 90) drawList.push(m);
     for (const c of G.critters) if (!c.gone && c.x > left - 60 && c.x < right + 60 && c.y > top - 60 && c.y < bottom + 60) drawList.push(c);
     for (const e of G.enemies) if (e.x > left - 120 && e.x < right + 120 && e.y > top - 120 && e.y < bottom + 160) drawList.push(e);
+    for (const c of G.crates || []) if (c.x > left - 60 && c.x < right + 60 && c.y > top - 60 && c.y < bottom + 60) drawList.push(c);
+    if (G.boss) drawList.push(G.boss);
     drawList.push(P);
     drawList.sort((a, b) => a.y - b.y);
     mark('listbuild');
     for (const o of drawList) {
-      if (o.kind === 'player' || o.kind === 'enemy' || o.kind === 'critter' || o.kind === 'mushroom') { drawEntityItem(ctx, o, t); continue; }
+      if (o.kind === 'player' || o.kind === 'enemy' || o.kind === 'critter' || o.kind === 'mushroom' || o.kind === 'crate' || o.kind === 'boss') { drawEntityItem(ctx, o, t); continue; }
       // プレイヤーが木やテントのかげに入ったら、木を半透明にして見えるようにする
       const fade = o.y > P.y && Math.abs(P.x - o.x) < (o.hw || 50) * 0.7 && P.y > o.y - (o.hgt || 60) * 0.95;
       drawObstacle(ctx, o, t, fade);
@@ -3850,16 +4479,19 @@ const Render = (() => {
     let red = G.flashRed > 0 ? clamp(G.flashRed / 0.4, 0, 1) * 0.9 : 0;
     if (G.state === 'playing' && P.hp > 0 && P.hp < 30) red = Math.max(red, 0.35 + 0.25 * Math.sin(t * 6));
     const purple = P.slowT > 0 ? Math.min(1, P.slowT) * (0.3 + 0.12 * Math.sin(t * 5)) : 0;
-    setFx(red, purple);
+    setFx(red, purple, G.night || 0, G.eve || 0);
     if (G.state === 'playing') drawIndicators(ctx, V, t);
     mark('overlay');
   }
 
-  function setFx(red, purple) {
-    if (!fxRed) { fxRed = document.getElementById('fxRed'); fxPurple = document.getElementById('fxPurple'); }
+  let fxNight = null; let fxEve = null;
+  function setFx(red, purple, night, eve) {
+    if (!fxRed) { fxRed = document.getElementById('fxRed'); fxPurple = document.getElementById('fxPurple'); fxNight = document.getElementById('fxNight'); fxEve = document.getElementById('fxEve'); }
     if (!fxRed) return;
     if (Math.abs(red - fxLast.r) > 0.02) { fxLast.r = red; fxRed.style.opacity = red.toFixed(2); }
     if (Math.abs(purple - fxLast.p) > 0.02) { fxLast.p = purple; fxPurple.style.opacity = purple.toFixed(2); }
+    if (fxNight && Math.abs(night - (fxLast.n || 0)) > 0.01) { fxLast.n = night; fxNight.style.opacity = night.toFixed(2); }
+    if (fxEve && Math.abs(eve - (fxLast.e || 0)) > 0.01) { fxLast.e = eve; fxEve.style.opacity = eve.toFixed(2); }
   }
 
   function drawIndicators(ctx, V, t) {
@@ -3870,6 +4502,9 @@ const Render = (() => {
       if (Math.hypot(e.x - P.x, e.y - P.y) > 900) continue;
       edgeArrow(ctx, V, e.x, e.y, '#ff4d4d', '!', 1);
     }
+    if (G.ev) { ctx.globalAlpha = 0.85 + Math.sin(t * 6) * 0.15; edgeArrow(ctx, V, G.ev.x, G.ev.y, '#b04cff', '大発生', 1.2); ctx.globalAlpha = 1; }
+    if (G.boss && !G.boss.dead) { edgeArrow(ctx, V, G.boss.x, G.boss.y, '#8a3fd0', 'ボス', 1.3); }
+    for (const c of G.crates || []) edgeArrow(ctx, V, c.x, c.y, '#ffb347', '箱', 0.9);
     // 金色キノコがいるあいだは、その方向をいつも示す
     if (G.gold && !G.gold.dead) {
       ctx.globalAlpha = 0.8 + Math.sin(t * 8) * 0.2;
@@ -3941,6 +4576,9 @@ const Render = (() => {
       else dot(m.x, m.y, 2.4, '#ffffff');
     }
     for (const e of G.enemies) if (Math.hypot(e.x - P.x, e.y - P.y) < 800) dot(e.x, e.y, 3.8, '#ff3b3b');
+    if (G.ev) { g.fillStyle = 'rgba(176,76,255,0.45)'; g.beginPath(); g.arc(G.ev.x * k, G.ev.y * k, G.ev.r * k, 0, TAU); g.fill(); }
+    for (const c of G.crates || []) dot(c.x, c.y, 3.4, '#ffb347');
+    if (G.boss && !G.boss.dead) dot(G.boss.x, G.boss.y, 6, '#8a3fd0');
     // 見えているはんい
     const V = G.view;
     g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 1.4;
@@ -3976,7 +4614,7 @@ const UI = {
   last: {},
   init() {
     for (const id of ['hud', 'hpFill', 'hpText', 'score', 'combo', 'comboN', 'comboM', 'comboFill', 'chips', 'timer', 'btnSound', 'btnPause', 'toast', 'banner', 'hint',
-      'title', 'pause', 'result', 'touchHints', 'thL', 'thR', 'btnStart', 'btnResume', 'btnQuit', 'btnRetry', 'btnToTitle', 'bestTitle', 'resTitle', 'resRank', 'resMsg', 'resScore', 'resNew', 'resStats']) {
+      'title', 'pause', 'result', 'touchHints', 'thL', 'thR', 'event', 'eventText', 'eventFill', 'bossBar', 'bossFill', 'mission', 'missionText', 'missionProg', 'hiscores', 'todayForest', 'btnStart', 'btnResume', 'btnQuit', 'btnRetry', 'btnToTitle', 'bestTitle', 'resTitle', 'resRank', 'resMsg', 'resScore', 'resNew', 'resStats']) {
       this.el[id] = $(id);
     }
   },
@@ -4044,11 +4682,59 @@ const UI = {
     });
     if (slow) { const c = $('chipSlow'); if (c) c.textContent = P.slowT.toFixed(1) + 's'; }
     if (boost) { const c = $('chipBoost'); if (c) c.textContent = P.boostT.toFixed(1) + 's'; }
+    // 武器
+    const wkey = G.weapon || '';
+    this.set('weaponKey', wkey, (v) => {
+      const old = e.chips.querySelector('.chip.weapon'); if (old) old.remove();
+      if (v) { const d = document.createElement('div'); d.className = 'chip weapon ' + v; d.innerHTML = Features.C.weapons[v].name + '<i id="chipWeapon"></i>'; e.chips.appendChild(d); }
+    });
+    if (wkey) { const c = $('chipWeapon'); if (c) c.textContent = G.weaponT.toFixed(1) + 's'; }
+    // 大発生
+    const ev = G.ev;
+    this.set('evShow', !!ev, (v) => e.event.classList.toggle('hidden', !v));
+    if (ev) {
+      const alive = ev.mush.length;
+      this.set('evText', Math.ceil(ev.left) + ':' + alive, () => { e.eventText.textContent = 'どくの大発生! のこり ' + alive + '本 / ' + Math.ceil(ev.left) + 'びょう'; });
+      e.eventFill.style.width = clamp(ev.left / Features.C.outbreak.limit, 0, 1) * 100 + '%';
+    }
+    // ボス
+    const B = G.boss;
+    this.set('bossShow', !!(B && !B.dead), (v) => e.bossBar.classList.toggle('hidden', !v));
+    if (B) e.bossFill.style.width = clamp(B.hp / B.maxHp, 0, 1) * 100 + '%';
+    // ミッション
+    const M = G.missions;
+    const cur = M && M.cur;
+    this.set('missionShow', !!cur && G.state === 'playing', (v) => e.mission.classList.toggle('hidden', !v));
+    if (cur) {
+      this.set('missionText', cur.def.id, () => { e.missionText.textContent = cur.def.text; });
+      this.set('missionProg', cur.prog + '/' + cur.def.n, (v) => { e.missionProg.textContent = v; });
+    }
+    this.set('missionFlash', M && M.flash > 0, (v) => e.mission.classList.toggle('done', !!v));
     if (power) { const c = $('chipPower'); if (c) c.textContent = G.power.toFixed(1) + 's'; const f = $('chipPowerFill'); if (f) f.style.width = (G.power / CONFIG.power.time) * 100 + '%'; }
   },
 };
 
 // ---------- ハイスコア ----------
+function loadTable() { try { const t = JSON.parse(localStorage.getItem('kinoko_table') || '[]'); return Array.isArray(t) ? t : []; } catch (e) { return []; } }
+function saveTable(t) { try { localStorage.setItem('kinoko_table', JSON.stringify(t.slice(0, 5))); } catch (e) { /* 無視 */ } }
+function addToTable(score, rank) {
+  const t = loadTable();
+  const d = new Date();
+  t.push({ s: score, r: rank, d: (d.getMonth() + 1) + '/' + d.getDate() });
+  t.sort((a, b) => b.s - a.s);
+  saveTable(t);
+  return t.slice(0, 5);
+}
+function renderTable() {
+  const t = loadTable().slice(0, 5);
+  UI.el.hiscores.innerHTML = t.map((r) => `<li>${r.r}ランク ${r.d}<span>${r.s.toLocaleString('en-US')}</span></li>`).join('');
+}
+// 日替わりの森: 日付からシードを決める
+function dailySeed() {
+  const d = new Date();
+  const n = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  return (CONFIG.world.seed + n * 7919) >>> 0;
+}
 function loadBest() { try { return parseInt(localStorage.getItem('kinoko_best') || '0', 10) || 0; } catch (e) { return 0; } }
 function saveBest(v) { try { localStorage.setItem('kinoko_best', String(v)); } catch (e) { /* 保存できなくても遊べる */ } }
 
@@ -4095,15 +4781,17 @@ function showResult() {
   if (isBest) saveBest(G.score);
   const e = UI.el;
   e.resTitle.textContent = reason === 'time' ? 'タイムアップ!' : 'やられちゃった…';
-  const ranks = [[9000, 'S', 'もりの でんせつ!'], [5000, 'A', 'もりの ヒーロー!'], [2500, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
-  const [, letter, msg] = ranks.find((r) => G.score >= r[0]);
+  const ranks = [[12000, 'S', 'もりの でんせつ!'], [7000, 'A', 'もりの ヒーロー!'], [3500, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
+  let [, letter, msg] = ranks.find((r) => G.score >= r[0]);
+  if (G.stats.boss && letter !== 'S') { letter = String.fromCharCode(letter.charCodeAt(0) - 1); if (letter === '@') letter = 'S'; msg = 'ボスを たおした! ' + msg; }
+  addToTable(G.score, letter); renderTable();
   e.resRank.textContent = letter;
   e.resRank.style.background = letter === 'S' ? 'radial-gradient(circle at 35% 30%, #fff6a0, #ff5fb0)' : letter === 'A' ? 'radial-gradient(circle at 35% 30%, #ffe98a, #ff9d2e)' : letter === 'B' ? 'radial-gradient(circle at 35% 30%, #c8f5b0, #43c06a)' : 'radial-gradient(circle at 35% 30%, #d8e6ff, #7a9be0)';
   e.resMsg.textContent = msg;
   e.resScore.textContent = G.score.toLocaleString('en-US');
   e.resNew.classList.toggle('hidden', !isBest || G.score === 0);
   const s = G.stats;
-  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった どうぶつ', s.inked + '匹'], ['体当たりで ふっとばし', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
+  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['ミッション', s.missions + '個'], ['大発生を しずめた', s.outbreaksCleared + '/' + s.outbreaks + '回'], ['キノコおやかた', s.boss ? 'たいじ!' : 'にがした'], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった どうぶつ', s.inked + '匹'], ['体当たりで ふっとばし', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
   e.resStats.innerHTML = rows.map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
   e.bestTitle.textContent = Math.max(prevBest, G.score).toLocaleString('en-US');
   UI.show('result', true);
@@ -4228,8 +4916,10 @@ function boot() {
   G.cam = { x: 0, y: 0, shake: 0, kx: 0, ky: 0 };
   G.view = { left: 0, top: 0 };
   G.clock = 0; G.paused = false; G.state = 'title'; G.dispScore = 0;
-  G.world = buildWorld(CONFIG.world.seed);
+  G.world = buildWorld(dailySeed());
   UI.init();
+  { const d = new Date(); $('todayForest').textContent = 'きょうの森 ' + (d.getMonth() + 1) + '/' + d.getDate() + '(まいにち ちがう森)'; }
+  renderTable();
   resetGame();
   Render.resize();
   Render.buildMini();
@@ -4275,12 +4965,12 @@ function boot() {
   window.addEventListener('blur', () => { if (G.state === 'playing') setPaused(true); });
 
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');
-  for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gold', 'gold'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar']]) Art.drawIcon($(id), what);
+  for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gold', 'gold'], ['ic-boss', 'boss'], ['ic-crate', 'crate'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar']]) Art.drawIcon($(id), what);
 
   drawMapIcon($('ic-map'));
 
   // 動作確認用: URL に ?debug を付けるとコンソールから状態を触れる
-  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
+  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, Features, purify, hitMushroom, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
 
   requestAnimationFrame(loop);
 }

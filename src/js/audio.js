@@ -93,6 +93,16 @@ const Sound = (() => {
       tone(60, 0.6, 'sine', 0.25, 30); noise(0.5, 0.12, 900, 'lowpass');
       [2093, 2637].forEach((f, i) => tone(f, 0.5, 'sine', 0.06, null, 0.45 + i * 0.1));
     },
+    alarm() { for (let i = 0; i < 3; i++) { tone(660, 0.16, 'square', 0.07, null, i * 0.24); tone(520, 0.16, 'square', 0.07, null, i * 0.24 + 0.12); } },
+    clear() { [523, 659, 784, 1047, 1319].forEach((f, i) => { tone(f, 0.25, 'triangle', 0.1, null, i * 0.08); }); tone(1568, 0.6, 'sine', 0.07, null, 0.45); },
+    pickup() { [880, 1175, 1760].forEach((f, i) => tone(f, 0.12, 'square', 0.05, null, i * 0.06)); },
+    bubble() { tone(600, 0.12, 'sine', 0.07, 900); },
+    charged() { tone(1200, 0.1, 'sine', 0.06, 1800); tone(1800, 0.12, 'sine', 0.04, null, 0.08); },
+    beam() { noise(0.25, 0.14, 1800, 'highpass'); tone(300, 0.3, 'sawtooth', 0.1, 90); tone(1400, 0.2, 'sine', 0.06, 400); },
+    mission() { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.18, 'triangle', 0.09, null, i * 0.07)); },
+    bossRoar() { noise(0.9, 0.16, 400, 'lowpass'); tone(70, 0.9, 'sawtooth', 0.14, 40); tone(140, 0.6, 'square', 0.05, 60, 0.1); },
+    spore() { for (let i = 0; i < 4; i++) tone(500 + i * 90, 0.08, 'sine', 0.05, 300, i * 0.05); },
+    bossDown() { [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => { tone(f, 0.35, 'triangle', 0.1, null, i * 0.09); tone(f * 2, 0.3, 'sine', 0.05, null, i * 0.09); }); noise(0.6, 0.12, 1200, 'lowpass'); tone(50, 0.8, 'sine', 0.25, 30); },
     powerEnd() { [784, 659, 523].forEach((f, i) => tone(f, 0.2, 'triangle', 0.08, null, i * 0.12)); },
   };
 

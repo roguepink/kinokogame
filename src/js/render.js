@@ -221,7 +221,7 @@ const Render = (() => {
     const wob = m.wob > 0 ? Math.sin(t * 38) * 0.16 * (m.wob / 0.3) : 0;
     const idle = Math.sin(t * 3 + m.t * 1.2) * 0.03 + (m.hitT > 0 ? -m.hitT * 1.6 : 0);
     const sc = m.size * clamp(back, 0.01, 1.3) * 1.1;
-    const glowA = 0.55 + Math.sin(t * 4 + m.t) * 0.2;
+    const glowA = Math.min(1, 0.55 + Math.sin(t * 4 + m.t) * 0.2 + (G.night || 0) * 0.45);
     ctx.save(); ctx.globalAlpha = glowA;
     Art.blit(ctx, poison ? S.glowPoison : S.glowGood, m.x, m.y - 18 * m.size, 0.62 * m.size);
     ctx.restore();
@@ -257,10 +257,20 @@ const Render = (() => {
     const P = G.player;
     switch (o.kind) {
       case 'mushroom': drawMushroom(ctx, o, t); break;
+      case 'crate': ctx.save(); ctx.translate(o.x, o.y); Art.drawCrate(ctx, o, t); ctx.restore(); break;
+      case 'boss': {
+        ctx.save(); ctx.translate(o.x, o.y);
+        if (o.dead) ctx.globalAlpha = Math.max(0, 1 - (t % 100) * 0); // 消えるまでそのまま
+        ctx.scale(o.face || 1, 1);
+        Art.drawBoss(ctx, o, t);
+        ctx.restore();
+        break;
+      }
       case 'critter':
         ctx.save(); ctx.translate(o.x, o.y); ctx.scale(CH, CH);
         if (o.type === 'rabbit') Art.drawRabbit(ctx, o, t); else Art.drawSquirrel(ctx, o, t);
         ctx.restore();
+        if (o.follow > 0) { ctx.save(); ctx.translate(o.x, o.y - 44 + Math.sin(t * 5) * 2); heartPath(ctx, 0, 0, 6); ctx.fillStyle = '#ff6fa0'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = OUT; ctx.stroke(); ctx.restore(); }
         break;
       case 'enemy': {
         ctx.save(); ctx.translate(o.x, o.y);
@@ -287,6 +297,11 @@ const Render = (() => {
         ctx.scale(sq * CH, (2 - sq) * CH);
         Art.drawBoy(ctx, o, t);
         ctx.restore();
+        if (G.weapon === 'charge' && G.charge > 0) {
+          const k = clamp(G.charge / Features.C.weapons.charge.need, 0, 1);
+          ctx.fillStyle = 'rgba(40,20,50,0.7)'; ctx.fillRect(o.x - 22, o.y - 72, 44, 7);
+          ctx.fillStyle = k >= 1 ? '#fff' : '#4fc3ff'; ctx.fillRect(o.x - 20.5, o.y - 70.5, 41 * k, 4);
+        }
         break;
       }
       default: break;
@@ -353,6 +368,25 @@ const Render = (() => {
       else Art.blit(ctx, S.splat[d.v], 0, 0, d.s * pop);
       ctx.restore();
     }
+  }
+
+  // ---------- 大発生・汚染・ボスの毒の雲 ----------
+  function zone(ctx, x, y, r, inner, outer) {
+    const gr = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
+    gr.addColorStop(0, inner); gr.addColorStop(1, outer);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.85, 0, 0, TAU); ctx.fill();
+  }
+  function drawZones(ctx, t) {
+    for (const z of G.taints || []) { const a = Math.min(1, z.life / 5) * 0.5; zone(ctx, z.x, z.y, z.r, `rgba(120,40,170,${a})`, 'rgba(120,40,170,0)'); }
+    const ev = G.ev;
+    if (ev) {
+      const pulse = 0.45 + Math.sin(t * 4) * 0.1;
+      zone(ctx, ev.x, ev.y, ev.r, `rgba(140,40,200,${pulse})`, 'rgba(140,40,200,0)');
+      ctx.strokeStyle = `rgba(200,90,255,${0.5 + Math.sin(t * 6) * 0.3})`; ctx.lineWidth = 3; ctx.setLineDash([12, 10]); ctx.lineDashOffset = -t * 30;
+      ctx.beginPath(); ctx.ellipse(ev.x, ev.y, ev.r, ev.r * 0.85, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const B = G.boss;
+    if (B && B.cloud > 0) { const k = Math.min(1, B.cloud / 0.6); zone(ctx, B.x, B.y, Features.C.boss.cloudR, `rgba(150,50,220,${0.5 * k})`, 'rgba(150,50,220,0)'); }
   }
 
   // ---------- 敵の攻撃予告(赤いゾーン) ----------
@@ -441,6 +475,7 @@ const Render = (() => {
         ctx.strokeStyle = 'rgba(60,70,20,0.45)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-a.size, 0); ctx.lineTo(a.size, 0); ctx.stroke();
         ctx.restore();
       } else {
+        if (a.firefly) { ctx.globalAlpha *= 0.5 + 0.5 * Math.sin(a.ph * 4); ctx.fillStyle = 'rgba(212,255,90,0.35)'; ctx.beginPath(); ctx.arc(a.x, a.y, a.size * 3, 0, TAU); ctx.fill(); }
         ctx.fillStyle = a.color; ctx.beginPath(); ctx.arc(a.x, a.y, a.size, 0, TAU); ctx.fill();
       }
     }
@@ -462,7 +497,31 @@ const Render = (() => {
 
   function drawProjectiles(ctx) {
     const S = Art.S;
+    for (const s of G.spores || []) {
+      ctx.fillStyle = 'rgba(30,60,40,0.22)'; ctx.beginPath(); ctx.ellipse(s.x, s.y, 6, 3, 0, 0, TAU); ctx.fill();
+      ctx.save(); ctx.translate(s.x, s.y - s.z); ctx.rotate(s.t * 6);
+      Art.circ(ctx, 0, 0, 7, '#a24be0', 1.8); Art.circ(ctx, -2, -2, 2.2, '#e2b0ff', 0);
+      for (let i = 0; i < 5; i++) { const a = (i / 5) * TAU; Art.circ(ctx, Math.cos(a) * 8, Math.sin(a) * 8, 2, '#c35cff', 0); }
+      ctx.restore();
+    }
     for (const p of G.proj) {
+      if (p.pierce) {
+        ctx.save(); ctx.translate(p.x, p.y - p.h); ctx.rotate(Math.atan2(p.vy, p.vx));
+        ctx.fillStyle = 'rgba(79,195,255,0.35)'; ctx.beginPath(); ctx.ellipse(-30, 0, 46, p.hr, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#9be0ff'; ctx.beginPath(); ctx.ellipse(-16, 0, 34, p.hr * 0.65, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-8, -2, 20, p.hr * 0.3, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      if (p.bubble) {
+        ctx.fillStyle = 'rgba(30,60,40,0.18)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 10, 5, 0, 0, TAU); ctx.fill();
+        const y = p.y - p.h; const r = 16 + Math.sin(p.ph * 2) * 1.5;
+        ctx.fillStyle = 'rgba(160,225,255,0.35)'; ctx.beginPath(); ctx.arc(p.x, y, r, 0, TAU); ctx.fill();
+        ctx.fillStyle = 'rgba(255,61,154,0.45)'; ctx.beginPath(); ctx.arc(p.x, y, r * 0.6, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, y, r, 0, TAU); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.ellipse(p.x - r * 0.4, y - r * 0.4, r * 0.3, r * 0.18, -0.6, 0, TAU); ctx.fill();
+        continue;
+      }
       ctx.fillStyle = 'rgba(30,60,40,0.22)'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 5, 2.6, 0, 0, TAU); ctx.fill();
       ctx.lineCap = 'round';
       ctx.strokeStyle = p.gold ? 'rgba(255,225,90,0.35)' : 'rgba(255,61,154,0.28)'; ctx.lineWidth = 9;
@@ -558,6 +617,7 @@ const Render = (() => {
       drawPatch(ctx, p, t);
     }
     mark('patches');
+    drawZones(ctx, t);
     drawDecals(ctx, left, top, right, bottom);
     drawTelegraphs(ctx, t);
     mark('decals');
@@ -572,11 +632,13 @@ const Render = (() => {
     for (const m of G.mushrooms) if (!m.dead && !m.hidden && m.x > left - 80 && m.x < right + 80 && m.y > top - 60 && m.y < bottom + 90) drawList.push(m);
     for (const c of G.critters) if (!c.gone && c.x > left - 60 && c.x < right + 60 && c.y > top - 60 && c.y < bottom + 60) drawList.push(c);
     for (const e of G.enemies) if (e.x > left - 120 && e.x < right + 120 && e.y > top - 120 && e.y < bottom + 160) drawList.push(e);
+    for (const c of G.crates || []) if (c.x > left - 60 && c.x < right + 60 && c.y > top - 60 && c.y < bottom + 60) drawList.push(c);
+    if (G.boss) drawList.push(G.boss);
     drawList.push(P);
     drawList.sort((a, b) => a.y - b.y);
     mark('listbuild');
     for (const o of drawList) {
-      if (o.kind === 'player' || o.kind === 'enemy' || o.kind === 'critter' || o.kind === 'mushroom') { drawEntityItem(ctx, o, t); continue; }
+      if (o.kind === 'player' || o.kind === 'enemy' || o.kind === 'critter' || o.kind === 'mushroom' || o.kind === 'crate' || o.kind === 'boss') { drawEntityItem(ctx, o, t); continue; }
       // プレイヤーが木やテントのかげに入ったら、木を半透明にして見えるようにする
       const fade = o.y > P.y && Math.abs(P.x - o.x) < (o.hw || 50) * 0.7 && P.y > o.y - (o.hgt || 60) * 0.95;
       drawObstacle(ctx, o, t, fade);
@@ -600,16 +662,19 @@ const Render = (() => {
     let red = G.flashRed > 0 ? clamp(G.flashRed / 0.4, 0, 1) * 0.9 : 0;
     if (G.state === 'playing' && P.hp > 0 && P.hp < 30) red = Math.max(red, 0.35 + 0.25 * Math.sin(t * 6));
     const purple = P.slowT > 0 ? Math.min(1, P.slowT) * (0.3 + 0.12 * Math.sin(t * 5)) : 0;
-    setFx(red, purple);
+    setFx(red, purple, G.night || 0, G.eve || 0);
     if (G.state === 'playing') drawIndicators(ctx, V, t);
     mark('overlay');
   }
 
-  function setFx(red, purple) {
-    if (!fxRed) { fxRed = document.getElementById('fxRed'); fxPurple = document.getElementById('fxPurple'); }
+  let fxNight = null; let fxEve = null;
+  function setFx(red, purple, night, eve) {
+    if (!fxRed) { fxRed = document.getElementById('fxRed'); fxPurple = document.getElementById('fxPurple'); fxNight = document.getElementById('fxNight'); fxEve = document.getElementById('fxEve'); }
     if (!fxRed) return;
     if (Math.abs(red - fxLast.r) > 0.02) { fxLast.r = red; fxRed.style.opacity = red.toFixed(2); }
     if (Math.abs(purple - fxLast.p) > 0.02) { fxLast.p = purple; fxPurple.style.opacity = purple.toFixed(2); }
+    if (fxNight && Math.abs(night - (fxLast.n || 0)) > 0.01) { fxLast.n = night; fxNight.style.opacity = night.toFixed(2); }
+    if (fxEve && Math.abs(eve - (fxLast.e || 0)) > 0.01) { fxLast.e = eve; fxEve.style.opacity = eve.toFixed(2); }
   }
 
   function drawIndicators(ctx, V, t) {
@@ -620,6 +685,9 @@ const Render = (() => {
       if (Math.hypot(e.x - P.x, e.y - P.y) > 900) continue;
       edgeArrow(ctx, V, e.x, e.y, '#ff4d4d', '!', 1);
     }
+    if (G.ev) { ctx.globalAlpha = 0.85 + Math.sin(t * 6) * 0.15; edgeArrow(ctx, V, G.ev.x, G.ev.y, '#b04cff', '大発生', 1.2); ctx.globalAlpha = 1; }
+    if (G.boss && !G.boss.dead) { edgeArrow(ctx, V, G.boss.x, G.boss.y, '#8a3fd0', 'ボス', 1.3); }
+    for (const c of G.crates || []) edgeArrow(ctx, V, c.x, c.y, '#ffb347', '箱', 0.9);
     // 金色キノコがいるあいだは、その方向をいつも示す
     if (G.gold && !G.gold.dead) {
       ctx.globalAlpha = 0.8 + Math.sin(t * 8) * 0.2;
@@ -691,6 +759,9 @@ const Render = (() => {
       else dot(m.x, m.y, 2.4, '#ffffff');
     }
     for (const e of G.enemies) if (Math.hypot(e.x - P.x, e.y - P.y) < 800) dot(e.x, e.y, 3.8, '#ff3b3b');
+    if (G.ev) { g.fillStyle = 'rgba(176,76,255,0.45)'; g.beginPath(); g.arc(G.ev.x * k, G.ev.y * k, G.ev.r * k, 0, TAU); g.fill(); }
+    for (const c of G.crates || []) dot(c.x, c.y, 3.4, '#ffb347');
+    if (G.boss && !G.boss.dead) dot(G.boss.x, G.boss.y, 6, '#8a3fd0');
     // 見えているはんい
     const V = G.view;
     g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 1.4;
