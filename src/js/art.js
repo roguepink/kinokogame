@@ -979,6 +979,76 @@ const Art = (() => {
     for (let i = 0; i < 3; i++) { const a = t * 3 + (i * TAU) / 3; star(g, Math.cos(a) * 26, -24 + Math.sin(a * 1.3) * 16, 3.5 + Math.sin(t * 9 + i) * 1.2, a, '#fff6a8', 0); }
   }
 
+  // ---------- 武器の箱 ----------
+  function drawCrate(g, c, t) {
+    const bob = Math.sin(t * 3 + c.t) * 2;
+    softShadow(g, 20, 8, 0.4, 0, 2);
+    g.save(); g.translate(0, -bob);
+    const col = { spread: '#ff9d2e', charge: '#4fc3ff', bubble: '#9be0ff' }[c.w];
+    g.save(); g.globalAlpha = 0.5 + Math.sin(t * 5) * 0.2; blit(g, S.glowGold, 0, -14, 0.7); g.restore();
+    rrect(g, -16, -30, 32, 28, 4, '#c9955c', 2.4);
+    g.fillStyle = 'rgba(80,40,10,0.25)'; g.fillRect(-16, -16, 32, 3); g.fillRect(-2, -30, 3, 28);
+    g.strokeStyle = '#7a4a2a'; g.lineWidth = 1.6; g.strokeRect(-12, -26, 24, 20);
+    rrect(g, -18, -32, 36, 7, 3, col, 2.2);
+    g.fillStyle = '#fff'; g.font = '800 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 3; g.strokeStyle = OUT; g.strokeText('?', 0, -15); g.fillStyle = col; g.fillText('?', 0, -15);
+    g.restore();
+    for (let i = 0; i < 2; i++) { const a = t * 2.5 + i * Math.PI; star(g, Math.cos(a) * 22, -18 + Math.sin(a * 1.4) * 8, 3, a, '#fff6a8', 0); }
+  }
+
+  // ---------- ボス「キノコおやかた」 ----------
+  function drawBoss(g, B, t) {
+    const sc = 3.1;
+    const weak = B.weak > 0;
+    const wob = B.wob > 0 ? Math.sin(t * 30) * 0.08 : 0;
+    const breath = Math.sin(t * 1.6) * 0.02;
+    const intro = B.intro > 0 ? clamp(1 - B.intro / 2.2, 0, 1) : 1;
+    const rise = (1 - intro) * 60;
+    softShadow(g, 70 * intro, 24 * intro, 0.5, 0, 6);
+    g.save(); g.translate(0, rise); g.scale(sc * (1 + breath), sc * (1 - breath) * intro);
+    g.rotate(wob);
+    // 足
+    for (const sx of [-1, 1]) { ell(g, sx * 9, -1, 7, 3.6, '#e9dcc0', 1.6); }
+    // 軸(太い)
+    g.beginPath(); g.moveTo(-13, 1); g.quadraticCurveTo(-15, -18, -11, -26); g.lineTo(11, -26); g.quadraticCurveTo(15, -18, 13, 1); g.quadraticCurveTo(0, 6, -13, 1); g.closePath();
+    const sg = g.createLinearGradient(-13, 0, 13, 0); sg.addColorStop(0, '#f3e9d2'); sg.addColorStop(0.5, '#fff8e8'); sg.addColorStop(1, '#cdbfa0');
+    fillStroke(g, sg, 1.6);
+    // 顔
+    for (const sx of [-1, 1]) {
+      ell(g, sx * 5, -14, 3.2, 3.8, '#fff', 1.2); circ(g, sx * 4.6, -13.4, 1.9, OUT, 0); circ(g, sx * 4.2, -14.2, 0.7, '#fff', 0);
+      g.strokeStyle = OUT; g.lineWidth = 1.6; g.lineCap = 'round'; g.beginPath(); g.moveTo(sx * 9.5, -20.5); g.lineTo(sx * 2, -17.5); g.stroke();
+    }
+    g.strokeStyle = OUT; g.lineWidth = 1.3; g.beginPath();
+    if (weak) { g.moveTo(-4, -6); g.quadraticCurveTo(0, -1.5, 4, -6); g.stroke(); poly(g, [-2.5, -5.5, -1, -3, 0, -5.5], '#fff', 0.8); poly(g, [2.5, -5.5, 1, -3, 0, -5.5], '#fff', 0.8); }
+    else { g.moveTo(-5, -5); g.lineTo(-2, -7); g.lineTo(0, -5); g.lineTo(2, -7); g.lineTo(5, -5); g.stroke(); }
+    // ひげ
+    g.strokeStyle = '#8a7a60'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-3, -9.5); g.quadraticCurveTo(-7, -11, -9, -8); g.moveTo(3, -9.5); g.quadraticCurveTo(7, -11, 9, -8); g.stroke();
+    // かさ(弱点のときは持ち上がって裏が見える)
+    const lift = weak ? 9 + Math.sin(t * 6) * 1.2 : 0;
+    g.save(); g.translate(0, -lift);
+    ell(g, 0, -25, 30, 7, weak ? '#ff6fb0' : '#5a2d80', 1.8);
+    if (weak) { // 弱点: 光る
+      g.save(); g.globalAlpha = 0.6 + Math.sin(t * 10) * 0.3; blit(g, S.glowGold, 0, -25, 0.45); g.restore();
+      ell(g, 0, -25, 26, 5, '#ffe14d', 1.4); g.fillStyle = '#ff3d9a'; g.beginPath(); g.arc(0, -25, 5, 0, TAU); g.fill();
+      g.strokeStyle = '#7a2d60'; g.lineWidth = 0.8; for (let i = -22; i <= 22; i += 5.5) { g.beginPath(); g.moveTo(i, -28); g.lineTo(i * 0.9, -22); g.stroke(); }
+    }
+    g.beginPath(); g.moveTo(-30, -25); g.quadraticCurveTo(-34, -66, 0, -68); g.quadraticCurveTo(34, -66, 30, -25); g.quadraticCurveTo(0, -16, -30, -25); g.closePath();
+    const cg = g.createLinearGradient(-26, -68, 24, -20); cg.addColorStop(0, '#b56cff'); cg.addColorStop(0.45, '#8a3fd0'); cg.addColorStop(1, '#4a1a7a');
+    fillStroke(g, cg, 2);
+    g.save(); g.clip();
+    g.fillStyle = 'rgba(255,255,255,0.22)'; g.beginPath(); g.ellipse(-12, -54, 10, 5, -0.5, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(20,0,50,0.3)'; g.beginPath(); g.ellipse(14, -28, 24, 14, 0, 0, TAU); g.fill();
+    g.restore();
+    for (const [x, y, r] of [[-14, -46, 5.5], [8, -58, 4.5], [18, -38, 5], [-2, -34, 3.5], [-22, -34, 3.2], [6, -44, 3]]) circ(g, x, y, r, '#ffe94d', 1.2);
+    // 王冠
+    poly(g, [-9, -66, -6, -76, -3, -68, 0, -79, 3, -68, 6, -76, 9, -66], '#ffd23f', 1.4);
+    circ(g, -6, -75, 1.4, '#ff3d9a', 0); circ(g, 6, -75, 1.4, '#4fc3ff', 0); circ(g, 0, -78, 1.6, '#9dffb0', 0);
+    g.restore();
+    g.restore();
+    // 胞子・いかり
+    if (B.flash > 0) { g.save(); g.globalAlpha = B.flash * 4; g.globalCompositeOperation = 'lighter'; circ(g, 0, -130, 80, 'rgba(255,255,255,0.4)', 0); g.restore(); }
+  }
+
   // ---------- 橋 ----------
   function drawBridge(g, b) {
     g.save(); g.translate(b.x, b.y); g.rotate(b.ang);
@@ -1023,6 +1093,8 @@ const Art = (() => {
     const fake = { x: 0, y: 0, face: 1, t: 0.4, st: 0, dur: 1, hp: 1, maxHp: 1, state: 'wander', moving: false, hopU: 0, atk: '' };
     if (what === 'poison') blit(g, S.mush.poison[0], 0, 0);
     else if (what === 'good') blit(g, S.mush.good[0], 0, 0);
+    else if (what === 'boss') { g.scale(0.36, 0.36); g.translate(0, 0); drawBoss(g, { weak: 1, wob: 0, intro: 0, flash: 0 }, 0.5); }
+    else if (what === 'crate') { g.scale(1.3, 1.3); drawCrate(g, { w: 'charge', t: 0 }, 0.4); }
     else if (what === 'gold') { g.scale(0.9, 0.9); drawGold(g, { moving: true, runT: 1.2, face: 1, hitT: 0 }, 0.4); }
     else if (what === 'rabbit') { g.scale(1.5, 1.5); drawRabbit(g, fake, 0); }
     else if (what === 'squirrel') { g.scale(1.5, 1.5); drawSquirrel(g, fake, 0); }
@@ -1033,5 +1105,5 @@ const Art = (() => {
     g.restore();
   }
 
-  return { OUT, INK, S, init, blit, mk, drawBoy, drawBoar, drawBear, drawGorilla, drawRabbit, drawSquirrel, drawGold, drawBridge, drawIcon, star, ell, circ, poly, rrect, shadow, TREE_COL };
+  return { OUT, INK, S, init, blit, mk, drawBoy, drawBoar, drawBear, drawGorilla, drawRabbit, drawSquirrel, drawGold, drawCrate, drawBoss, drawBridge, drawIcon, star, ell, circ, poly, rrect, shadow, TREE_COL };
 })();

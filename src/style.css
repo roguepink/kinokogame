@@ -30,6 +30,8 @@ body.touch canvas#game { cursor: default; }
 #fx, #fx div { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
 #fxVig { background: radial-gradient(ellipse at center, rgba(255, 230, 160, 0.06) 0%, rgba(15, 60, 50, 0) 45%, rgba(10, 45, 40, 0.45) 100%); }
 #fxRed { opacity: 0; background: radial-gradient(ellipse at center, rgba(255, 30, 60, 0) 30%, rgba(255, 30, 60, 0.85) 100%); }
+#fxEve { opacity: 0; background: linear-gradient(rgba(255, 150, 60, 0.18), rgba(255, 110, 90, 0.26)); mix-blend-mode: multiply; }
+#fxNight { opacity: 0; background: radial-gradient(ellipse 34% 40% at 50% 52%, rgba(10, 20, 60, 0.12) 0%, rgba(8, 15, 50, 0.5) 60%, rgba(5, 10, 40, 0.72) 100%); }
 #fxPurple { opacity: 0; background: radial-gradient(ellipse at center, rgba(170, 60, 255, 0) 30%, rgba(170, 60, 255, 0.8) 100%); }
 
 /* ---------- ゲーム中のHUD ---------- */
@@ -78,6 +80,32 @@ body.touch canvas#game { cursor: default; }
 .icon-btn svg { width: 100%; height: 100%; display: block; }
 .icon-btn.muted #iconWaves { display: none; }
 
+/* イベント・ボス・ミッション */
+.hud-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.event { min-width: 220px; padding: 3px 14px 8px; text-align: center; font-size: 15px; color: #fff; background: linear-gradient(#c56bff, #7a2fc0); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 3px 0 rgba(53, 40, 63, 0.45); text-shadow: 0 1px 0 var(--ink); position: relative; animation: bump 0.3s; }
+.event-bar { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 4px; border-radius: 3px; background: rgba(53, 40, 63, 0.4); overflow: hidden; }
+.event-bar div { height: 100%; width: 100%; background: #fff; }
+.boss { width: min(44vw, 420px); padding: 2px 12px 8px; text-align: center; font-size: 14px; color: #fff; background: rgba(53, 40, 63, 0.85); border: 3px solid var(--ink); border-radius: 14px; position: relative; text-shadow: 0 1px 0 #000; }
+.boss-bar { margin-top: 2px; height: 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.5); overflow: hidden; border: 1.5px solid #000; }
+.boss-bar div { height: 100%; width: 100%; background: linear-gradient(#c56bff, #7a2fc0); transition: width 0.15s; }
+.mission { position: absolute; left: calc(10px + var(--safe-l)); bottom: calc(14px + var(--safe-b)); max-width: 46vw; padding: 4px 12px 6px; background: rgba(255, 253, 244, 0.92); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 rgba(53, 40, 63, 0.45); font-size: 13px; }
+.mission.done { animation: bump 0.4s; background: #d8ffd8; }
+.m-label { font-size: 10px; color: var(--green); letter-spacing: 0.1em; }
+.m-text { font-size: 13px; line-height: 1.3; }
+.m-prog { font-size: 12px; color: var(--purple); font-variant-numeric: tabular-nums; }
+body.touch .mission { bottom: calc(150px + var(--safe-b)); max-width: 40vw; font-size: 12px; }
+.chip.weapon { background: linear-gradient(#8fd8ff, #2f9ad8); }
+.chip.weapon.spread { background: linear-gradient(#ffc36a, #e07a1a); }
+.chip.weapon.bubble { background: linear-gradient(#c8f0ff, #5bb8e8); color: var(--ink); text-shadow: none; }
+.chip.weapon.bubble i { color: var(--ink); }
+.lead .ev-t { color: #8a3fd0; }
+.lead .boss-t { color: #5a2d80; }
+.legend li.boss-l { background: linear-gradient(#f3e6ff, #e2ccff); border-color: #5a2d80; }
+.today { display: block; font-size: 12px; opacity: 0.75; }
+.hiscores { margin: 6px auto 0; padding: 0 0 0 1.6em; max-width: 300px; text-align: left; font-size: 12.5px; line-height: 1.5; }
+.hiscores li span { float: right; color: var(--pink); font-variant-numeric: tabular-nums; }
+.hiscores:empty { display: none; }
+
 /* ---------- 仮想スティック ---------- */
 .stick { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 5; }
 .stick .ring { position: absolute; left: -56px; top: -56px; width: 112px; height: 112px; border-radius: 50%; border: 4px dashed rgba(255, 255, 255, 0.75); background: rgba(255, 255, 255, 0.18); }
@@ -85,7 +113,7 @@ body.touch canvas#game { cursor: default; }
 .stick.right .knob { background: rgba(255, 150, 205, 0.95); }
 
 /* ---------- ふきだし ---------- */
-#toast { position: fixed; top: calc(88px + var(--safe-t)); left: 50%; transform: translateX(-50%); max-width: 90vw; padding: 6px 18px; font-size: clamp(14px, 3.6vw, 18px); background: #fff; border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 4px 0 rgba(53, 40, 63, 0.5); pointer-events: none; z-index: 8; animation: toast-in 0.25s; text-align: center; }
+#toast { position: fixed; top: calc(132px + var(--safe-t)); left: 50%; transform: translateX(-50%); max-width: 90vw; padding: 6px 18px; font-size: clamp(14px, 3.6vw, 18px); background: #fff; border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 4px 0 rgba(53, 40, 63, 0.5); pointer-events: none; z-index: 8; animation: toast-in 0.25s; text-align: center; }
 #banner { position: fixed; left: 0; right: 0; top: 34%; text-align: center; pointer-events: none; z-index: 8; font-size: clamp(44px, 12vw, 96px); color: #fff; -webkit-text-stroke: 8px var(--ink); paint-order: stroke fill; text-shadow: 0 8px 0 rgba(53, 40, 63, 0.45); animation: banner 1.4s ease-out forwards; }
 #hint { position: fixed; bottom: calc(18px + var(--safe-b)); left: 50%; transform: translateX(-50%); max-width: 94vw; padding: 6px 16px; font-size: clamp(12px, 3.2vw, 16px); background: rgba(255, 255, 255, 0.92); border: 3px solid var(--ink); border-radius: 18px; pointer-events: none; z-index: 8; text-align: center; animation: toast-in 0.3s; }
 
@@ -152,6 +180,7 @@ body.touch .controls .touch-only { display: block; }
   .logo h1 { font-size: clamp(30px, 7vw, 48px); -webkit-text-stroke-width: 7px; }
   .lead { margin: 2px 0 6px; font-size: 12px; line-height: 1.45; }
   .legend { grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 6px; }
+  .hiscores { display: none; }
   .legend li { grid-template-columns: 40px 1fr; padding: 3px 6px; }
   .legend canvas { width: 40px; height: 40px; }
   .legend li.enemy { grid-column: 1 / 4; grid-template-columns: repeat(3, 34px) 1fr; }
@@ -163,6 +192,11 @@ body.touch .controls .touch-only { display: block; }
   .best { margin-top: 4px; font-size: 12px; }
   .rank { width: 64px; height: 64px; font-size: 42px; }
   .res-stats { font-size: 12px; }
+}
+@media (min-width: 640px) and (min-height: 561px) {
+  .legend { grid-template-columns: repeat(3, 1fr); }
+  .legend li.enemy { grid-column: 1 / 4; }
+  .lead { margin-bottom: 6px; }
 }
 @media (max-width: 420px) {
   .legend { grid-template-columns: 1fr; }
@@ -198,7 +232,9 @@ body.touch #touchHints.show { display: block; }
   .combo { padding: 2px 9px 7px; }
   .combo-n { font-size: 16px; }
   .combo-m { font-size: 12px; }
-  #toast { top: calc(100px + var(--safe-t)); }
+  #toast { top: calc(150px + var(--safe-t)); }
+  .boss { width: 150px; font-size: 11px; padding: 1px 8px 6px; }
+  .event { min-width: 0; font-size: 12px; padding: 2px 10px 7px; }
 }
 @media (max-width: 340px) {
   .hp-bar { width: 66px; }

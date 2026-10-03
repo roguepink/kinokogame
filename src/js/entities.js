@@ -235,6 +235,7 @@ function resetGame() {
   const sp = G.world.randomSpot(Math.random, (x, y) => Math.hypot(x - G.player.x, y - G.player.y) < 260 && Math.hypot(x - G.player.x, y - G.player.y) > 140);
   if (sp) { near.x = sp.x; near.y = sp.y; }
   for (let i = 0; i < CONFIG.director.start; i++) spawnEnemy(true);
+  Features.reset();
 }
 
 // ---------- スコア ----------
@@ -289,7 +290,8 @@ function updatePlayer(dt) {
   }
 
   let mv = playing ? Input.move() : { x: 0, y: 0 };
-  let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1);
+  let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1) * Features.playerSpeedMul();
+  if (G.weapon === 'charge' && G.charge > 0) speed *= 0.55; // ためている間は足がおそい
   const tx = mv.x * speed;
   const ty = mv.y * speed;
   P.vx = approach(P.vx, tx, C.accel * dt);
@@ -328,8 +330,9 @@ function updatePlayer(dt) {
   P.aim = a.angle;
   P.face = Math.cos(P.aim) >= 0 ? 1 : -1;
   P.firing = a.fire && playing;
-  if (P.firing && P.fireCd <= 0) {
-    shoot(P, a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim);
+  const aimA = (P.firing || G.charge > 0) ? (a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim) : P.aim;
+  if (!Features.weaponFire(P, aimA, dt) && P.firing && P.fireCd <= 0) {
+    shoot(P, aimA);
     P.fireCd = 1 / (G.power > 0 ? CONFIG.power.rate : CONFIG.gun.rate);
   }
   // ブースト中のスピード線
@@ -387,24 +390,40 @@ function updateProjectiles(dt) {
     p.life -= dt;
     p.t += dt;
     if (p.homing) homeProjectile(p, dt);
+    if (p.bubble) { p.ph += dt * 6; p.x += Math.cos(p.ph) * 30 * dt; p.y += Math.sin(p.ph) * 20 * dt; p.vx *= Math.exp(-0.5 * dt); p.vy *= Math.exp(-0.5 * dt); }
     p.x += p.vx * dt; p.y += p.vy * dt;
     p.dropT += Math.hypot(p.vx, p.vy) * dt;
-    p.h = Math.max(4, p.h - dt * 14);
+    if (!p.bubble) p.h = Math.max(4, p.h - dt * 14);
     if (p.dropT > 140) { p.dropT = 0; addDecal(p.x + rr(-5, 5), p.y + rr(-5, 5), 0.34, 'drop', 6); }
     let dead = p.life <= 0;
     let hitKind = null;
     if (!dead) {
       // 草むらに隠れたキノコにも当たる
+      const extra = p.hr || 0;
       for (const m of G.mushrooms) {
         if (m.dead || m.type === 'good') continue;
-        if (Math.hypot(m.x - p.x, m.y - p.y) < m.hr) { hitMushroom(m, p); dead = true; hitKind = 'mushroom'; break; }
+        if (Math.hypot(m.x - p.x, m.y - p.y) < m.hr + extra) {
+          if (p.pierce) { if (!p.hit.has(m)) { p.hit.add(m); hitMushroom(m, p); } continue; }
+          if (p.bubble) { dead = true; hitKind = 'bubble'; break; }
+          hitMushroom(m, p); dead = true; hitKind = 'mushroom'; break;
+        }
       }
     }
     if (!dead) {
+      const extra = p.hr || 0;
       for (const e of G.enemies) {
         if (e.state === 'flee') continue;
-        if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.hr) { hitEnemy(e, p); dead = true; hitKind = 'enemy'; break; }
+        if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.hr + extra) {
+          if (p.pierce) { if (!p.hit.has(e)) { p.hit.add(e); hitEnemy(e, p); } continue; }
+          if (p.bubble) { dead = true; hitKind = 'bubble'; break; }
+          hitEnemy(e, p); dead = true; hitKind = 'enemy'; break;
+        }
       }
+    }
+    if (!dead && G.boss && !G.boss.dead && Math.hypot(G.boss.x - p.x, G.boss.y - 30 - p.y) < G.boss.hr + (p.hr || 0)) {
+      if (p.pierce) { if (!p.hit.has(G.boss)) { p.hit.add(G.boss); Features.hitBoss(p); } }
+      else if (p.bubble) { dead = true; hitKind = 'bubble'; }
+      else { Features.hitBoss(p); dead = true; hitKind = 'enemy'; }
     }
     if (!dead) {
       W.hash.query(p.x - 4, p.y - 4, p.x + 4, p.y + 4, (o) => {
@@ -413,6 +432,7 @@ function updateProjectiles(dt) {
         if (Math.hypot(o.x - p.x, o.y - p.y) < o.r + 2) { dead = true; hitKind = 'wall'; }
       });
     }
+    if (dead && p.bubble) { Features.bubbleBurst(p); hitKind = 'bubble'; }
     if (dead) {
       if (!hitKind || hitKind === 'wall') {
         if (W.tileAt(p.x, p.y) === T_WATER) {
@@ -487,6 +507,7 @@ function purify(m) {
   G.cam.shake = Math.max(G.cam.shake, big ? 7 : 4);
   G.hitStop = Math.max(G.hitStop, big ? 0.1 : 0.055);
   Sound.sfx.pop(G.combo);
+  Features.onPurify(m);
   if (gold) { G.gold = null; G.goldT = CONFIG.mushroom.goldEvery; G.stats.gold += 1; activatePower(); }
 }
 
@@ -636,7 +657,8 @@ function updateEnemy(e, dt) {
       e.wanderT -= dt;
       if (e.wanderT <= 0 || Math.hypot(e.tx - e.x, e.ty - e.y) < 14 || e.stuckT > 1.2) {
         // 森の動物はプレイヤーの気配に引かれて、少しずつ近づいてくる
-        if (alive && d < 1500) { e.homeX += (P.x - e.homeX) * 0.3; e.homeY += (P.y - e.homeY) * 0.3; }
+        if (G.ev && Math.hypot(G.ev.x - e.x, G.ev.y - e.y) < 1100) { e.homeX += (G.ev.x - e.homeX) * 0.5; e.homeY += (G.ev.y - e.homeY) * 0.5; }
+        else if (alive && d < 1500) { e.homeX += (P.x - e.homeX) * 0.3; e.homeY += (P.y - e.homeY) * 0.3; }
         const a = Math.random() * TAU;
         const r = rr(80, 260);
         e.tx = e.homeX + Math.cos(a) * r; e.ty = e.homeY + Math.sin(a) * r;
@@ -779,6 +801,7 @@ function updateCritter(c, dt) {
     return;
   }
   c.t += dt;
+  if (c.follow > 0) { Features.updateCompanion(c, dt); return; }
   const dx = P.x - c.x;
   const dy = P.y - c.y;
   const d = Math.hypot(dx, dy);
@@ -800,7 +823,7 @@ function collectCritter(c) {
   const C = CONFIG.player;
   P.boostT = Math.min(P.boostT + C.boostTime, C.boostMax);
   G.stats.boosts += 1;
-  c.gone = true; c.respawn = rr(6, 10);
+  if (!Features.recruit(c)) { c.gone = true; c.respawn = rr(6, 10); }
   floatText(c.x, c.y - 40, 'スピードアップ!', '#ffe14d', 22);
   burst(c.x, c.y - 14, 16, { s0: 50, s1: 150, l0: 0.4, l1: 0.8, z0: 3, z1: 6, color: ['#ffe14d', '#fff6a8', '#ffffff'], shape: 'spark' });
   ring(c.x, c.y - 4, 6, 50, 0.4, 'rgba(255,230,90,0.9)', 4);
@@ -969,7 +992,7 @@ function updateAmbientFx(dt) {
       x: V.left + Math.random() * V.vw, y: V.top - 40 + (leaf ? 0 : Math.random() * (V.vh + 40)),
       vx: leaf ? rr(14, 36) : rr(-6, 6), vy: leaf ? rr(22, 44) : rr(-5, 5), leaf,
       life: leaf ? rr(5, 9) : rr(3, 6), max: 0, size: leaf ? rr(4, 7) : rr(1.5, 3), ph: Math.random() * TAU, rot: Math.random() * TAU, vr: rr(-2.5, 2.5),
-      color: leaf ? ['#c9d651', '#e4a84a', '#8fc24d', '#d97b3a'][Math.floor(Math.random() * 4)] : 'rgba(255,250,200,0.9)',
+      color: leaf ? ['#c9d651', '#e4a84a', '#8fc24d', '#d97b3a'][Math.floor(Math.random() * 4)] : (G.night > 0.3 ? '#d4ff5a' : 'rgba(255,250,200,0.9)'), firefly: !leaf && G.night > 0.3,
     });
     list[list.length - 1].max = list[list.length - 1].life;
   }
@@ -1006,7 +1029,7 @@ function updateGame(dt) {
   for (const m of G.mushrooms) updateMushroom(m, dt);
   updateParticles(dt);
   updateAmbientFx(dt);
-  if (playing) updateDirector(dt);
+  if (playing) { updateDirector(dt); Features.update(dt); }
 }
 
 // タイトル画面の背景: 動物とパーティクルだけ動かす

@@ -10,7 +10,7 @@
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="fx"><div id="fxVig"></div><div id="fxRed"></div><div id="fxPurple"></div></div>
+<div id="fx"><div id="fxEve"></div><div id="fxNight"></div><div id="fxVig"></div><div id="fxRed"></div><div id="fxPurple"></div></div>
 
 <!-- ゲーム中の表示 -->
 <div id="hud" class="hidden">
@@ -23,7 +23,12 @@
     <div class="combo hidden" id="combo"><span class="combo-n" id="comboN"></span><span class="combo-m" id="comboM"></span><div class="combo-bar"><div id="comboFill"></div></div></div>
     <div class="chips" id="chips"></div>
   </div>
-  <div class="hud-center"><div class="timer" id="timer">3:00</div></div>
+  <div class="hud-center">
+    <div class="timer" id="timer">3:00</div>
+    <div class="event hidden" id="event"><span id="eventText"></span><div class="event-bar"><div id="eventFill"></div></div></div>
+    <div class="boss hidden" id="bossBar"><span>キノコおやかた</span><div class="boss-bar"><div id="bossFill"></div></div></div>
+  </div>
+  <div class="mission hidden" id="mission"><div class="m-label">ミッション</div><div class="m-text" id="missionText"></div><div class="m-prog" id="missionProg"></div></div>
   <div class="hud-right">
     <canvas id="minimap"></canvas>
     <div class="btns">
@@ -49,12 +54,14 @@
       <div class="logo-small">インクで もりを おそうじ!</div>
       <h1><span class="l1">どく</span><span class="l2">キノコ</span><span class="l3">大作戦</span></h1>
     </div>
-    <p class="lead">もりに はえた <b class="poison">どくキノコ</b>を インクの みずでっぽうで うちまくれ!<br>せいげんじかんは <b>3ぷん</b>。 <b class="gold-t">金色のキノコ</b>を たおすと むてきの パワーアップ!</p>
+    <p class="lead">もりに はえた <b class="poison">どくキノコ</b>を インクの みずでっぽうで うちまくれ!<br>せいげんじかんは <b>3ぷん</b>(ミッションで のびる)。 <b class="ev-t">どくの大発生</b>を しずめ、<b class="gold-t">金色のキノコ</b>で パワーアップ、さいごは <b class="boss-t">ボス</b>!</p>
     <ul class="legend">
       <li><canvas id="ic-poison" width="72" height="72"></canvas><b>どくキノコ</b><span>うって きれいにしよう<br>(さわると のろのろ…)</span></li>
       <li><canvas id="ic-good" width="72" height="72"></canvas><b>ふつうのキノコ</b><span>さわって たべると<br>HPかいふく</span></li>
       <li><canvas id="ic-rabbit" width="72" height="72"></canvas><b>うさぎ・リス</b><span>さわると<br>スピードアップ!</span></li>
       <li class="gold"><canvas id="ic-gold" width="72" height="72"></canvas><b>金色のキノコ</b><span>走ってにげる! たおすと<br>10びょう ゴールドパワー</span></li>
+      <li class="boss-l"><canvas id="ic-boss" width="72" height="72"></canvas><b>キノコおやかた</b><span>のこり1ぷんで とうじょう<br>かさを あげたら ねらえ!</span></li>
+      <li><canvas id="ic-crate" width="72" height="72"></canvas><b>武器の箱</b><span>ひろうと しばらく<br>みずでっぽうが かわる</span></li>
       <li><canvas id="ic-map" width="72" height="72"></canvas><b>ミニマップ</b><span>むらさきの点が どくキノコ<br>あかい点が てき</span></li>
       <li class="enemy"><canvas id="ic-gorilla" width="72" height="72"></canvas><canvas id="ic-bear" width="72" height="72"></canvas><canvas id="ic-boar" width="72" height="72"></canvas><b>ゴリラ・クマ・イノシシ</b><span>こうげきされると ダメージ!<br>インクで おいはらおう</span></li>
     </ul>
@@ -63,7 +70,8 @@
       <div class="touch-only"><b>スマホ</b> 左がわ ドラッグ: うごく ・ 右がわ ドラッグ: ねらって うつ</div>
     </div>
     <button id="btnStart" class="big-btn">あそぶ!</button>
-    <div class="best">ハイスコア <b id="bestTitle">0</b></div>
+    <div class="best">ハイスコア <b id="bestTitle">0</b> <span class="today" id="todayForest"></span></div>
+    <ol class="hiscores" id="hiscores"></ol>
   </div>
 </div>
 
@@ -97,6 +105,7 @@
 <script src="js/audio.js"></script>
 <script src="js/input.js"></script>
 <script src="js/entities.js"></script>
+<script src="js/features.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>
 </body>
