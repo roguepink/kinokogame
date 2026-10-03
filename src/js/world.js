@@ -243,6 +243,20 @@ function buildWorld(seed) {
     addLog(x, y, ang, Math.floor(R(0, 2)), 1.1);
   }
 
+  // ---- 土の小道(見た目だけ。歩きやすさは変わらない) ----
+  W.paths = [];
+  const trailDefs = [
+    [[W.start.x, W.start.y], [1250, 2480], [1550, 2300], [1850, 2450]],
+    [[700, 760], [1050, 900], [1500, 1150], [1900, 1500]],
+    [[3000, 1700], [2700, 2000], [2500, 2400], [2450, 2900]],
+    [[2600, 600], [2900, 900], [3100, 1300]],
+  ];
+  for (const pts of trailDefs) {
+    const wig = pts.map(([x, y], i) => (i === 0 || i === pts.length - 1 ? [x, y] : [x + R(-60, 60), y + R(-60, 60)]));
+    const path = catmullRom(wig, 18).filter((p) => W.tileAt(p.x, p.y) !== T_WATER);
+    W.paths.push({ path, w: R(26, 40) });
+  }
+
   // ---- 飾り(当たり判定なし): 草の房・花・小石・葦 ----
   const addDecor = (kind, x, y, v, extra) => {
     const d = Object.assign({ kind, x, y, v }, extra || {});
@@ -267,6 +281,16 @@ function buildWorld(seed) {
     if (W.tileAt(x, y) !== T_LAND) continue;
     addDecor('pebble', x, y, Math.floor(R(0, 3)));
   }
+  // 木の根もと: シダ・おちば・小さなキノコ
+  for (const t of W.trees) {
+    if (rng() < 0.45) { const a = R(0.2, Math.PI - 0.2); addDecor('fern', t.x + Math.cos(a) * R(24, 40) * t.s, t.y + Math.sin(a) * R(10, 22) * t.s + 4, Math.floor(R(0, 2))); }
+    if (rng() < 0.5) for (let k = 0; k < 3; k++) { const a = R(0, TAU); const d = R(14, 60) * t.s; const x = t.x + Math.cos(a) * d; const y = t.y + Math.sin(a) * d * 0.6 + 6; if (W.tileAt(x, y) === T_LAND) addDecor('leaf', x, y, t.v === 3 ? Math.floor(R(0, 3)) : Math.floor(R(2, 4)), { rot: R(0, TAU) }); }
+    if (rng() < 0.12) addDecor('shroomlet', t.x + R(-30, 30), t.y + R(6, 18), Math.floor(R(0, 2)));
+  }
+  for (let i = 0; i < 500; i++) { const x = R(40, S - 40); const y = R(40, S - 40); if (W.tileAt(x, y) === T_LAND) addDecor('leaf', x, y, Math.floor(R(0, 4)), { rot: R(0, TAU) }); }
+  for (let i = 0; i < 300; i++) { const x = R(40, S - 40); const y = R(40, S - 40); if (W.tileAt(x, y) === T_LAND) addDecor('fern', x, y, Math.floor(R(0, 2))); }
+  // 土が見えているところ・クローバーのような濃い草地
+  for (let i = 0; i < 160; i++) { const rr2 = R(40, 120); addDecor('dirt', R(0, S), R(0, S), 0, { rx: rr2, ry: rr2 * R(0.5, 0.7) }); }
   // 地面の濃淡(大きなぼかし円)
   for (let i = 0; i < 420; i++) {
     const rr = R(90, 260);

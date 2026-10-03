@@ -80,11 +80,15 @@ function makePlayer() {
 function makeMushroom(type, x, y, big) {
   const W = G.world;
   const patch = W.patchAt(x, y);
-  const hp = big ? CONFIG.mushroom.bigHp : CONFIG.mushroom.hp;
+  const C = CONFIG.mushroom;
+  const gold = type === 'gold';
+  const hp = gold ? C.goldHp : big ? C.bigHp : C.hp;
   return {
-    kind: 'mushroom', type, x, y, v: Math.random() < 0.5 ? 0 : 1, big: !!big, size: big ? 1.6 : 1,
-    hp: type === 'poison' ? hp : 1, maxHp: type === 'poison' ? hp : 1, hr: (big ? 30 : 19),
-    hidden: type === 'poison' && !!patch, inPatch: !!patch, wob: 0, t: Math.random() * 10, bubT: rr(0, 1), pop: 0, dead: false, hitT: 0,
+    kind: 'mushroom', type, x, y, v: Math.random() < 0.5 ? 0 : 1, big: !!big, size: gold ? 1.2 : big ? 1.6 : 1,
+    hp: type === 'good' ? 1 : hp, maxHp: type === 'good' ? 1 : hp, hr: gold ? 22 : (big ? 30 : 19),
+    hidden: type === 'poison' && !!patch, inPatch: !gold && !!patch, wob: 0, t: Math.random() * 10, bubT: rr(0, 1), pop: 0, dead: false, hitT: 0,
+    // 金色キノコ用: 走る
+    vx: 0, vy: 0, face: 1, moving: false, runT: 0, dir: Math.random() * TAU, turnT: 0, dashT: 0, life: gold ? C.goldLife : 0, pauseT: 0, bumpT: 0,
   };
 }
 function makeCritter(type) {
@@ -161,6 +165,20 @@ function spawnGoodMushroom() {
     return;
   }
 }
+function spawnGold() {
+  const W = G.world;
+  const P = G.player;
+  const s = W.randomSpot(Math.random, (x, y) => { const d = Math.hypot(x - P.x, y - P.y); return d > 520 && d < 950; }, 40);
+  if (!s) return null;
+  const m = makeMushroom('gold', s.x, s.y, false);
+  G.mushrooms.push(m);
+  G.gold = m;
+  G.stats.goldSeen += 1;
+  UI.toast('金色のキノコが あらわれた! にげる前に たおせ!', 3200);
+  Sound.sfx.gold();
+  return m;
+}
+
 function placeCritter(c, minDist) {
   const s = G.world.randomSpot(Math.random, (x, y) => farFromPlayer(x, y, minDist || 450));
   if (s) { c.x = s.x; c.y = s.y; }
@@ -200,7 +218,8 @@ function resetGame() {
   G.decals = new Array(520).fill(null); G.decalHead = 0;
   G.t = 0; G.timeLeft = CONFIG.timeLimit;
   G.score = 0; G.combo = 0; G.comboT = 0; G.comboMult = 1;
-  G.stats = { purified: 0, eaten: 0, boosts: 0, inked: 0, poisoned: 0, bestCombo: 0 };
+  G.stats = { purified: 0, eaten: 0, boosts: 0, inked: 0, poisoned: 0, bestCombo: 0, gold: 0, goldSeen: 0, rams: 0 };
+  G.power = 0; G.gold = null; G.goldT = CONFIG.mushroom.goldFirst; G.hitStop = 0; G.cam.kx = 0; G.cam.ky = 0;
   G.shownHints = {}; G.flashRed = 0; G.alertCd = 0; G.mushT = 0; G.over = null; G.fullHintT = 0;
   G.cam.shake = 0;
   // 毒キノコの群れ。最初の1つはスタートの近く
@@ -219,14 +238,21 @@ function resetGame() {
 }
 
 // ---------- スコア ----------
+// パワーアップ中は得点 2倍
+const scoreMul = () => (G.power > 0 ? CONFIG.power.scoreMul : 1);
 function addScore(pts, x, y, color) {
+  pts = Math.round(pts * scoreMul());
   G.score += pts;
-  floatText(x, y, '+' + pts, color || '#fff6a8', 22);
+  floatText(x, y, '+' + pts + (G.power > 0 ? ' x2' : ''), G.power > 0 ? '#ffe14d' : (color || '#fff6a8'), G.power > 0 ? 26 : 22);
 }
 
 function hurtPlayer(dmg, sx, sy, kb) {
   const P = G.player;
   if (P.invuln > 0 || G.state !== 'playing') return false;
+  if (G.power > 0) { // パワーアップ中はびくともしない
+    burst(P.x, P.y - 24, 8, { s0: 60, s1: 160, l0: 0.25, l1: 0.5, z0: 2, z1: 4, color: ['#ffe14d', '#fff'], shape: 'spark' });
+    return false;
+  }
   P.hp = Math.max(0, P.hp - dmg);
   P.invuln = CONFIG.player.invuln;
   P.hurtT = 0.5;
@@ -252,18 +278,34 @@ function updatePlayer(dt) {
   if (P.hurtT > 0) P.hurtT -= dt;
   if (P.slowT > 0) P.slowT -= dt;
   if (P.boostT > 0) P.boostT -= dt;
-  if (P.recoil > 0) P.recoil = Math.max(0, P.recoil - dt * 8);
+  if (P.recoil > 0) P.recoil = Math.max(0, P.recoil - dt * 9);
   if (P.fireCd > 0) P.fireCd -= dt;
+  if (G.power > 0) {
+    G.power -= dt;
+    if (G.power <= 0) { G.power = 0; UI.toast('パワーアップ おわり'); Sound.sfx.powerEnd(); }
+    else if (Math.random() < dt * 30) {
+      addParticle({ x: P.x + rr(-14, 14), y: P.y - rr(0, 44), vx: rr(-12, 12), vy: -rr(40, 90), ay: 0, drag: 0, life: rr(0.4, 0.8), max: 0.8, size: rr(2.5, 5), color: ['#ffe14d', '#fff6a8', '#ffb347'][Math.floor(Math.random() * 3)], shape: 'spark', rot: Math.random() * TAU, vr: 5, grow: 0 });
+    }
+  }
 
   let mv = playing ? Input.move() : { x: 0, y: 0 };
-  let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1);
+  let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1);
   const tx = mv.x * speed;
   const ty = mv.y * speed;
   P.vx = approach(P.vx, tx, C.accel * dt);
   P.vy = approach(P.vy, ty, C.accel * dt);
   const sp = Math.hypot(P.vx, P.vy);
   P.moving = sp > 24;
-  if (P.moving) P.walkT += dt * (7 + sp * 0.045);
+  if (P.moving) {
+    const prev = Math.sin(P.walkT);
+    P.walkT += dt * (6 + sp * 0.04);
+    // 足が地面についた瞬間に土ぼこり
+    if ((prev < 0) !== (Math.sin(P.walkT) < 0) && sp > 120) {
+      addParticle({ x: P.x + rr(-6, 6), y: P.y + 2, vx: -P.vx * 0.12 + rr(-10, 10), vy: -rr(6, 16), ay: -10, drag: 3, life: 0.4, max: 0.4, size: rr(3, 5), grow: 10, color: 'rgba(170,150,110,0.45)', shape: 'dust', rot: 0, vr: 0 });
+    }
+  }
+  // 走る方向へ少し体をかたむける
+  P.lean = approach(P.lean || 0, clamp(P.vx / 420, -0.22, 0.22), dt * 1.5);
   let dx = P.vx * dt;
   let dy = P.vy * dt;
   if (Math.abs(P.kx) + Math.abs(P.ky) > 3) {
@@ -288,7 +330,7 @@ function updatePlayer(dt) {
   P.firing = a.fire && playing;
   if (P.firing && P.fireCd <= 0) {
     shoot(P, a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim);
-    P.fireCd = 1 / CONFIG.gun.rate;
+    P.fireCd = 1 / (G.power > 0 ? CONFIG.power.rate : CONFIG.gun.rate);
   }
   // ブースト中のスピード線
   if (P.boostT > 0 && P.moving && Math.random() < dt * 40) {
@@ -315,7 +357,7 @@ function assistAim(angle, strong) {
     const tol = maxA + Math.atan2(hr, d);
     if (diff < tol && diff * d < bestScore) { bestScore = diff * d; best = ang; }
   };
-  for (const m of G.mushrooms) if (!m.dead && m.type === 'poison') test(m, m.hr);
+  for (const m of G.mushrooms) if (!m.dead && m.type !== 'good') test(m, m.hr);
   for (const e of G.enemies) if (e.state !== 'flee') test(e, e.def.hr);
   if (best === null) return angle;
   return angle + angleDiff(angle, best) * 0.7;
@@ -323,11 +365,18 @@ function assistAim(angle, strong) {
 
 function shoot(P, aim) {
   const g = CONFIG.gun;
+  const power = G.power > 0;
   const a = aim + (Math.random() - 0.5) * 2 * g.spread;
-  const sp = g.speed * rr(0.94, 1.06);
-  G.proj.push({ x: P.x + Math.cos(a) * 24, y: P.y + Math.sin(a) * 24, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: g.range / g.speed * rr(0.9, 1.05), dropT: 0, h: 22 });
+  const sp = g.speed * rr(0.94, 1.06) * (power ? 1.15 : 1);
+  const mx = P.x + Math.cos(a) * 30;
+  const my = P.y - 20 + Math.sin(a) * 30;
+  G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: g.range / g.speed * rr(0.9, 1.05), dropT: 0, h: 22, dmg: power ? CONFIG.power.damage : 1, gold: power, homing: power, t: 0 });
   P.recoil = 1;
-  Sound.sfx.shoot();
+  // 反動でカメラが少し後ろへ、銃口からしぶき
+  G.cam.kx -= Math.cos(a) * g.kick; G.cam.ky -= Math.sin(a) * g.kick;
+  addParticle({ x: mx, y: my, vx: 0, vy: 0, ay: 0, drag: 0, life: 0.07, max: 0.07, size: power ? 18 : 13, color: power ? '#fff3b0' : '#ffd0ea', shape: 'flash', rot: a, vr: 0, grow: 0 });
+  burst(mx, my, 3, { dir: a, spread: 0.9, s0: 80, s1: 200, l0: 0.15, l1: 0.3, z0: 1.5, z1: 3, color: power ? ['#ffe14d', '#fff'] : ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 300 });
+  Sound.sfx.shoot(power);
 }
 
 // ---------- インク弾 ----------
@@ -336,6 +385,8 @@ function updateProjectiles(dt) {
   const out = [];
   for (const p of G.proj) {
     p.life -= dt;
+    p.t += dt;
+    if (p.homing) homeProjectile(p, dt);
     p.x += p.vx * dt; p.y += p.vy * dt;
     p.dropT += Math.hypot(p.vx, p.vy) * dt;
     p.h = Math.max(4, p.h - dt * 14);
@@ -345,7 +396,7 @@ function updateProjectiles(dt) {
     if (!dead) {
       // 草むらに隠れたキノコにも当たる
       for (const m of G.mushrooms) {
-        if (m.dead || m.type !== 'poison') continue;
+        if (m.dead || m.type === 'good') continue;
         if (Math.hypot(m.x - p.x, m.y - p.y) < m.hr) { hitMushroom(m, p); dead = true; hitKind = 'mushroom'; break; }
       }
     }
@@ -368,8 +419,8 @@ function updateProjectiles(dt) {
           ring(p.x, p.y, 4, 22, 0.45, 'rgba(255,255,255,0.85)', 2.5);
           burst(p.x, p.y - 4, 4, { s0: 20, s1: 60, l0: 0.3, l1: 0.5, z0: 1.5, z1: 3, color: '#ffd0ea', ay: 160 });
         } else {
-          addDecal(p.x, p.y, rr(0.55, 0.85), 'splat', 14);
-          burst(p.x, p.y - 4, 5, { s0: 30, s1: 90, l0: 0.25, l1: 0.45, z0: 1.6, z1: 3.2, color: ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 240 });
+          addDecal(p.x, p.y, rr(0.6, 0.95), p.gold ? 'gsplat' : 'splat', 14);
+          burst(p.x, p.y - 4, 6, { s0: 30, s1: 110, l0: 0.25, l1: 0.45, z0: 1.6, z1: 3.4, color: p.gold ? ['#ffe14d', '#fff6a8'] : ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 240 });
           Sound.sfx.splat();
         }
       }
@@ -378,15 +429,38 @@ function updateProjectiles(dt) {
   G.proj = out;
 }
 
+// パワーアップ中の弾は、近くの毒キノコ・敵に曲がって飛んでいく
+function homeProjectile(p, dt) {
+  const sp = Math.hypot(p.vx, p.vy);
+  const a = Math.atan2(p.vy, p.vx);
+  let best = null;
+  let bestD = 360;
+  const test = (o) => {
+    const d = Math.hypot(o.x - p.x, o.y - p.y);
+    if (d > bestD || d < 6) return;
+    if (Math.abs(angleDiff(a, Math.atan2(o.y - p.y, o.x - p.x))) > 1.3) return;
+    bestD = d; best = o;
+  };
+  for (const m of G.mushrooms) if (!m.dead && m.type !== 'good') test(m);
+  for (const e of G.enemies) if (e.state !== 'flee') test(e);
+  if (!best) return;
+  const want = Math.atan2(best.y - (best.kind === 'enemy' ? 10 : 0) - p.y, best.x - p.x);
+  const na = a + clamp(angleDiff(a, want), -CONFIG.power.homing * dt, CONFIG.power.homing * dt);
+  p.vx = Math.cos(na) * sp; p.vy = Math.sin(na) * sp;
+}
+
 function hitMushroom(m, p) {
-  m.hp -= 1;
+  const dmg = p.dmg || 1;
+  m.hp -= dmg;
   m.wob = 0.3;
-  m.hitT = 0.12;
+  m.hitT = 0.14;
   if (m.hidden) { m.hidden = false; }
-  burst(p.x, p.y - 8, 6, { s0: 40, s1: 120, l0: 0.25, l1: 0.5, z0: 1.8, z1: 3.6, color: ['#ff3d9a', '#ff9ad0', '#c35cff'], shape: 'ink', ay: 260 });
-  addDecal(m.x + rr(-10, 10), m.y + rr(-4, 8), 0.5, 'splat', 12);
+  if (m.type === 'gold') { m.dashT = 0.45; m.dir = Math.atan2(p.vy, p.vx) + rr(-0.8, 0.8); } // 当たると飛びのく
+  burst(p.x, p.y - 8, 8, { dir: Math.atan2(p.vy, p.vx), spread: 2.4, s0: 50, s1: 160, l0: 0.25, l1: 0.5, z0: 1.8, z1: 4, color: p.gold ? ['#ffe14d', '#fff6a8', '#fff'] : ['#ff3d9a', '#ff9ad0', '#c35cff'], shape: 'ink', ay: 260 });
+  addDecal(m.x + rr(-10, 10), m.y + rr(-4, 8), 0.55, p.gold ? 'gsplat' : 'splat', 12);
+  G.cam.shake = Math.max(G.cam.shake, 2.2);
   Sound.sfx.splat();
-  if (m.hp <= 0) purify(m);
+  if (m.hp <= 0) purify(m); else G.hitStop = Math.max(G.hitStop, 0.025);
 }
 
 function purify(m) {
@@ -395,36 +469,77 @@ function purify(m) {
   G.comboT = CONFIG.mushroom.comboWindow;
   G.comboMult = comboMultiplier(G.combo);
   G.stats.bestCombo = Math.max(G.stats.bestCombo, G.combo);
-  const base = m.big ? CONFIG.mushroom.bigScore : CONFIG.mushroom.score;
-  const pts = Math.round(base * G.comboMult);
+  const gold = m.type === 'gold';
+  const base = gold ? CONFIG.mushroom.goldScore : m.big ? CONFIG.mushroom.bigScore : CONFIG.mushroom.score;
+  const pts = Math.round(base * G.comboMult * scoreMul());
   G.score += pts;
   G.stats.purified += 1;
-  floatText(m.x, m.y - 44 * m.size, '+' + pts + (G.comboMult > 1 ? '  x' + G.comboMult : ''), m.big ? '#ffe14d' : '#fff6a8', m.big ? 30 : 24);
-  burst(m.x, m.y - 20 * m.size, m.big ? 26 : 14, { s0: 60, s1: 190, l0: 0.5, l1: 1, z0: 2.5, z1: 5.5, color: ['#ff3d9a', '#ff9ad0', '#fff6a8', '#c35cff'], shape: 'spark', ay: 60 });
+  const tag = (G.comboMult > 1 ? '  x' + G.comboMult : '') + (G.power > 0 ? ' x2' : '');
+  floatText(m.x, m.y - 44 * m.size, '+' + pts + tag, gold || m.big || G.power > 0 ? '#ffe14d' : '#fff6a8', gold ? 34 : m.big ? 30 : 24);
+  const big = m.big || gold;
+  burst(m.x, m.y - 20 * m.size, big ? 30 : 18, { s0: 70, s1: 230, l0: 0.5, l1: 1, z0: 2.5, z1: 6, color: gold ? ['#ffe14d', '#fff6a8', '#fff', '#ffb347'] : ['#ff3d9a', '#ff9ad0', '#fff6a8', '#c35cff'], shape: 'spark', ay: 60 });
+  burst(m.x, m.y - 14 * m.size, big ? 16 : 9, { s0: 40, s1: 150, l0: 0.4, l1: 0.8, z0: 3, z1: 7, color: ['#ff3d9a', '#ff9ad0', '#c4126a'], shape: 'ink', ay: 420, drag: 1 });
   burst(m.x, m.y - 16 * m.size, 5, { s0: 15, s1: 40, l0: 0.9, l1: 1.4, z0: 6, z1: 9, color: '#ff9ad0', shape: 'heart', ay: -50 });
-  ring(m.x, m.y - 4, 8, m.big ? 90 : 56, 0.5, 'rgba(255,180,225,0.9)', 4);
-  addDecal(m.x, m.y, m.big ? 1.5 : 1, 'flower', 24);
-  addDecal(m.x, m.y, m.big ? 1.6 : 1.1, 'splat', 18);
-  Sound.sfx.pop();
+  ring(m.x, m.y - 4, 8, big ? 100 : 62, 0.45, gold ? 'rgba(255,230,120,0.95)' : 'rgba(255,180,225,0.9)', 5);
+  ring(m.x, m.y - 4, 4, big ? 60 : 36, 0.3, 'rgba(255,255,255,0.9)', 3);
+  addDecal(m.x, m.y, big ? 1.5 : 1, 'flower', 24);
+  addDecal(m.x, m.y, big ? 1.8 : 1.3, 'splat', 18);
+  G.cam.shake = Math.max(G.cam.shake, big ? 7 : 4);
+  G.hitStop = Math.max(G.hitStop, big ? 0.1 : 0.055);
+  Sound.sfx.pop(G.combo);
+  if (gold) { G.gold = null; G.goldT = CONFIG.mushroom.goldEvery; G.stats.gold += 1; activatePower(); }
+}
+
+// 金色キノコを倒したときのパワーアップ
+function activatePower() {
+  const P = G.player;
+  G.power = CONFIG.power.time;
+  P.slowT = 0;
+  UI.banner('ゴールドパワー!');
+  UI.toast('10びょうかん むてき! 弾は じどうで ねらう・体当たりで ふっとばせ!', 3500);
+  ring(P.x, P.y - 10, 10, 260, 0.7, 'rgba(255,225,90,0.9)', 8);
+  burst(P.x, P.y - 24, 40, { s0: 80, s1: 320, l0: 0.5, l1: 1.1, z0: 3, z1: 7, color: ['#ffe14d', '#fff6a8', '#fff', '#ffb347'], shape: 'spark', drag: 1.5 });
+  G.cam.shake = Math.max(G.cam.shake, 10);
+  G.hitStop = Math.max(G.hitStop, 0.16);
+  Sound.sfx.power();
 }
 
 function hitEnemy(e, p) {
-  e.hp -= 1;
+  e.hp -= p.dmg || 1;
   e.flash = 0.12;
   e.slow = 0.5;
-  e.kx += p.vx * 0.04; e.ky += p.vy * 0.04;
-  burst(p.x, p.y - 12, 5, { s0: 40, s1: 110, l0: 0.25, l1: 0.45, z0: 1.8, z1: 3.4, color: ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 260 });
-  addDecal(e.x + rr(-14, 14), e.y + rr(-4, 8), 0.5, 'splat', 10);
+  e.kx += p.vx * 0.045; e.ky += p.vy * 0.045;
+  burst(p.x, p.y - 12, 7, { dir: Math.atan2(p.vy, p.vx), spread: 2.2, s0: 50, s1: 140, l0: 0.25, l1: 0.45, z0: 1.8, z1: 3.6, color: p.gold ? ['#ffe14d', '#fff'] : ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 260 });
+  addDecal(e.x + rr(-14, 14), e.y + rr(-4, 8), 0.5, p.gold ? 'gsplat' : 'splat', 10);
+  G.cam.shake = Math.max(G.cam.shake, 1.8);
   Sound.sfx.hitEnemy();
   if (e.state === 'wander' && e.cool <= 0.5) { e.state = 'chase'; e.st = 0; e.seen = true; }
-  if (e.hp <= 0) {
-    e.state = 'flee'; e.st = 0; e.z = 0; e.hitDone = true;
-    G.stats.inked += 1;
+  if (e.hp <= 0) defeatEnemy(e, false);
+}
+
+// 敵を撃退: インクまみれで逃げていく。ram=true は体当たり(パワーアップ中)
+function defeatEnemy(e, ram) {
+  e.state = 'flee'; e.st = 0; e.z = 0; e.hitDone = true; e.hp = 0;
+  G.stats.inked += 1;
+  if (ram) {
+    G.stats.rams += 1;
+    const P = G.player;
+    const a = Math.atan2(e.y - P.y, e.x - P.x);
+    e.kx = Math.cos(a) * 900; e.ky = Math.sin(a) * 900;
+    addScore(CONFIG.power.ramScore, e.x, e.y - 70, '#ffe14d');
+    floatText(e.x, e.y - 100, 'ふっとばし!', '#ffe14d', 28);
+    G.cam.shake = Math.max(G.cam.shake, 9);
+    G.hitStop = Math.max(G.hitStop, 0.08);
+    Sound.sfx.slam();
+  } else {
     addScore(e.def.score, e.x, e.y - 70, '#ffb3dc');
-    ring(e.x, e.y - 6, 10, 80, 0.5, 'rgba(255,100,180,0.9)', 5);
-    burst(e.x, e.y - 30, 18, { s0: 60, s1: 200, l0: 0.5, l1: 0.9, z0: 2.5, z1: 5, color: ['#ff3d9a', '#ff9ad0', '#fff'], shape: 'spark', ay: 80 });
     floatText(e.x, e.y - 90, 'ぎゃふん!', '#ff9ad0', 22);
+    G.cam.shake = Math.max(G.cam.shake, 5);
+    G.hitStop = Math.max(G.hitStop, 0.06);
   }
+  ring(e.x, e.y - 6, 10, 90, 0.5, ram ? 'rgba(255,225,90,0.95)' : 'rgba(255,100,180,0.9)', 5);
+  burst(e.x, e.y - 30, 22, { s0: 60, s1: 220, l0: 0.5, l1: 0.9, z0: 2.5, z1: 5, color: ram ? ['#ffe14d', '#fff6a8', '#fff'] : ['#ff3d9a', '#ff9ad0', '#fff'], shape: 'spark', ay: 80 });
+  for (let i = 0; i < 4; i++) addDecal(e.x + rr(-30, 30), e.y + rr(-14, 14), rr(0.6, 1.1), ram ? 'gsplat' : 'splat', 14);
 }
 
 // ---------- 敵 ----------
@@ -606,6 +721,8 @@ function updateEnemy(e, dt) {
     }
     default: break;
   }
+  // パワーアップ中は体当たりでふっとばす
+  if (G.power > 0 && e.state !== 'flee' && d < def.cr + P.r + 8 && e.z < 30) { defeatEnemy(e, true); return; }
   // プレイヤーと体が重ならないように押し返す
   const min = def.cr + P.r;
   if (d < min && d > 0.01 && e.state !== 'flee' && e.z < 10) {
@@ -691,13 +808,66 @@ function collectCritter(c) {
 }
 
 // ---------- キノコ ----------
+// 金色キノコ: プレイヤーから逃げ回り、弾をよける。時間がたつと消える
+function updateGold(m, dt, d, dx, dy) {
+  const C = CONFIG.mushroom;
+  const P = G.player;
+  m.life -= dt;
+  if (m.life <= 0) {
+    m.dead = true; G.gold = null; G.goldT = C.goldEvery;
+    burst(m.x, m.y - 20, 18, { s0: 30, s1: 120, l0: 0.5, l1: 1, z0: 3, z1: 6, color: ['#ffe14d', '#fff6a8'], shape: 'spark', ay: -60 });
+    floatText(m.x, m.y - 50, 'にげられた…', '#ffe14d', 22);
+    UI.toast('金色のキノコに にげられた… また あらわれるかも');
+    return;
+  }
+  if (m.dashT > 0) m.dashT -= dt;
+  if (m.pauseT > 0) m.pauseT -= dt;
+  m.turnT -= dt;
+  const scared = d < C.goldFlee;
+  if (scared) {
+    const away = Math.atan2(-dy, -dx);
+    if (m.turnT <= 0 || m.dashT > 0.4) { m.turnT = rr(0.3, 0.7); m.dir = away + rr(-1.1, 1.1); }
+    // 飛んでくる弾を横によける
+    for (const p of G.proj) {
+      const t = ((m.x - p.x) * p.vx + (m.y - p.y) * p.vy) / (p.vx * p.vx + p.vy * p.vy + 1e-6);
+      if (t < 0 || t > 0.3) continue;
+      const cx = p.x + p.vx * t; const cy = p.y + p.vy * t;
+      if (Math.hypot(cx - m.x, cy - m.y) < 36 && m.dashT <= 0) { const side = Math.sign((m.x - p.x) * p.vy - (m.y - p.y) * p.vx) || 1; m.dir = Math.atan2(p.vy, p.vx) + side * 1.4; m.dashT = 0.3; m.turnT = 0.35; break; }
+    }
+  } else if (m.turnT <= 0) {
+    m.turnT = rr(0.8, 2);
+    if (Math.random() < 0.4) m.pauseT = rr(0.5, 1.4); else m.dir += rr(-1.5, 1.5);
+  }
+  let speed = scared ? C.goldSpeed : C.goldSpeed * 0.35;
+  if (m.dashT > 0) speed = C.goldSpeed * 1.7;
+  if (!scared && m.pauseT > 0) speed = 0;
+  // ゆらゆら走る
+  const wob = scared ? Math.sin(m.t * 9) * 0.35 : 0;
+  const a = m.dir + wob;
+  const px = m.x; const py = m.y;
+  const r = moveBody(m, Math.cos(a) * speed * dt, Math.sin(a) * speed * dt, 12);
+  if (r.hit || r.water || Math.hypot(m.x - px, m.y - py) < speed * dt * 0.3) { if (m.bumpT <= 0) { m.dir += rr(1.6, 2.6); m.bumpT = 0.25; } }
+  if (m.bumpT > 0) m.bumpT -= dt;
+  m.vx = (m.x - px) / dt; m.vy = (m.y - py) / dt;
+  m.moving = speed > 0;
+  if (m.moving) m.runT += dt * (speed / 12);
+  if (Math.abs(m.vx) > 8) m.face = m.vx > 0 ? 1 : -1;
+  // きらきらの足あと
+  if (m.moving && Math.random() < dt * 14) addParticle({ x: m.x + rr(-6, 6), y: m.y + rr(-2, 2), vx: rr(-8, 8), vy: -rr(10, 30), ay: 0, drag: 0, life: 0.7, max: 0.7, size: rr(2, 4), color: '#ffe14d', shape: 'spark', rot: Math.random() * TAU, vr: 4, grow: 0 });
+  // プレイヤーにさわられそうになったら飛びのく(食べられない)
+  if (d < P.r + 16 && m.dashT <= 0) { m.dir = Math.atan2(-dy, -dx) + rr(-0.5, 0.5); m.dashT = 0.4; }
+}
+
 function updateMushroom(m, dt) {
   const P = G.player;
   m.t += dt;
   if (m.wob > 0) m.wob -= dt;
   if (m.hitT > 0) m.hitT -= dt;
   if (m.pop < 1) m.pop = Math.min(1, m.pop + dt * 3.5);
-  const d = Math.hypot(P.x - m.x, P.y - m.y);
+  const dx = P.x - m.x;
+  const dy = P.y - m.y;
+  const d = Math.hypot(dx, dy);
+  if (m.type === 'gold') { if (!m.dead && G.state === 'playing') updateGold(m, dt, d, dx, dy); return; }
   if (m.hidden && d < CONFIG.mushroom.revealRadius) {
     m.hidden = false;
     burst(m.x, m.y - 14, 6, { s0: 20, s1: 70, l0: 0.4, l1: 0.7, z0: 2, z1: 4, color: ['#c35cff', '#e2b0ff'], shape: 'spark', ay: -30 });
@@ -773,6 +943,7 @@ function updateDirector(dt) {
     G.spawnT = (G.spawnT || 0) - dt;
     if (G.spawnT <= 0) { G.spawnT = 1.5; spawnEnemy(false); }
   }
+  if (!G.gold) { G.goldT -= dt; if (G.goldT <= 0) { if (!spawnGold()) G.goldT = 3; } }
   G.mushT -= dt;
   if (G.mushT <= 0) {
     G.mushT = 1.2;
@@ -781,7 +952,39 @@ function updateDirector(dt) {
     if (poison < CONFIG.mushroom.poisonTarget - 3) spawnPoisonCluster();
     if (good < CONFIG.mushroom.goodTarget) spawnGoodMushroom();
     G.mushrooms = G.mushrooms.filter((m) => !m.dead);
+    if (G.gold && G.gold.dead) G.gold = null;
   }
+}
+
+// 画面のまわりに、舞う葉っぱと光の粒をただよわせる
+function updateAmbientFx(dt) {
+  const V = G.view;
+  if (!V || !V.vw) return;
+  G.ambient = G.ambient || [];
+  const list = G.ambient;
+  const max = 46;
+  if (list.length < max && Math.random() < dt * 9) {
+    const leaf = Math.random() < 0.45;
+    list.push({
+      x: V.left + Math.random() * V.vw, y: V.top - 40 + (leaf ? 0 : Math.random() * (V.vh + 40)),
+      vx: leaf ? rr(14, 36) : rr(-6, 6), vy: leaf ? rr(22, 44) : rr(-5, 5), leaf,
+      life: leaf ? rr(5, 9) : rr(3, 6), max: 0, size: leaf ? rr(4, 7) : rr(1.5, 3), ph: Math.random() * TAU, rot: Math.random() * TAU, vr: rr(-2.5, 2.5),
+      color: leaf ? ['#c9d651', '#e4a84a', '#8fc24d', '#d97b3a'][Math.floor(Math.random() * 4)] : 'rgba(255,250,200,0.9)',
+    });
+    list[list.length - 1].max = list[list.length - 1].life;
+  }
+  const out = [];
+  for (const a of list) {
+    a.life -= dt;
+    if (a.life <= 0) continue;
+    a.ph += dt * (a.leaf ? 2.2 : 1.1);
+    a.x += (a.vx + Math.sin(a.ph) * (a.leaf ? 22 : 8)) * dt;
+    a.y += (a.vy + Math.cos(a.ph * 0.7) * (a.leaf ? 10 : 6)) * dt;
+    a.rot += a.vr * dt;
+    if (a.x < V.left - 80 || a.x > V.left + V.vw + 80 || a.y < V.top - 80 || a.y > V.top + V.vh + 80) continue;
+    out.push(a);
+  }
+  G.ambient = out;
 }
 
 function updateGame(dt) {
@@ -802,6 +1005,7 @@ function updateGame(dt) {
   for (const c of G.critters) updateCritter(c, dt);
   for (const m of G.mushrooms) updateMushroom(m, dt);
   updateParticles(dt);
+  updateAmbientFx(dt);
   if (playing) updateDirector(dt);
 }
 
@@ -811,6 +1015,7 @@ function updateAmbient(dt) {
   for (const c of G.critters) updateCritter(c, dt);
   for (const m of G.mushrooms) updateMushroom(m, dt);
   updateParticles(dt);
+  updateAmbientFx(dt);
 }
 
 if (typeof module !== 'undefined' && module.exports) module.exports = { rr };

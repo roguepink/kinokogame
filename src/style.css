@@ -28,7 +28,7 @@ body.touch canvas#game { cursor: default; }
 
 /* ---------- 画面効果(周辺減光・被ダメージ・どく) ---------- */
 #fx, #fx div { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
-#fxVig { background: radial-gradient(ellipse at center, rgba(15, 60, 50, 0) 50%, rgba(15, 60, 50, 0.38) 100%); }
+#fxVig { background: radial-gradient(ellipse at center, rgba(255, 230, 160, 0.06) 0%, rgba(15, 60, 50, 0) 45%, rgba(10, 45, 40, 0.45) 100%); }
 #fxRed { opacity: 0; background: radial-gradient(ellipse at center, rgba(255, 30, 60, 0) 30%, rgba(255, 30, 60, 0.85) 100%); }
 #fxPurple { opacity: 0; background: radial-gradient(ellipse at center, rgba(170, 60, 255, 0) 30%, rgba(170, 60, 255, 0.8) 100%); }
 
@@ -61,6 +61,11 @@ body.touch canvas#game { cursor: default; }
 .chip { display: flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 13px; color: #fff; border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 rgba(53, 40, 63, 0.45); text-shadow: 0 1px 0 var(--ink); }
 .chip.poison { background: linear-gradient(#c97cff, #8a3fd0); }
 .chip.boost { background: linear-gradient(#ffd24d, #ff9d2e); }
+.chip.power { position: relative; padding: 3px 12px 8px; font-size: 15px; background: linear-gradient(#fff3a0, #ffb300); color: #5a3a00; text-shadow: none; border-color: #7a4a00; box-shadow: 0 3px 0 rgba(90, 60, 0, 0.5), 0 0 14px rgba(255, 220, 80, 0.9); animation: powerGlow 0.5s infinite alternate; }
+.chip.power i { color: #5a3a00; }
+.chip-bar { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 4px; border-radius: 3px; background: rgba(90, 60, 0, 0.3); overflow: hidden; }
+.chip-bar div { height: 100%; background: #fff; width: 100%; }
+@keyframes powerGlow { from { box-shadow: 0 3px 0 rgba(90, 60, 0, 0.5), 0 0 8px rgba(255, 220, 80, 0.6); } to { box-shadow: 0 3px 0 rgba(90, 60, 0, 0.5), 0 0 22px rgba(255, 220, 80, 1); } }
 .chip i { font-style: normal; font-size: 12px; opacity: 0.95; min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
 
 .timer { min-width: 5.2ch; text-align: center; padding: 2px 16px 3px; font-size: clamp(22px, 5vw, 32px); font-variant-numeric: tabular-nums; background: var(--cream); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 3px 0 rgba(53, 40, 63, 0.45); }
@@ -97,6 +102,8 @@ body.touch canvas#game { cursor: default; }
 .logo .l3 { color: var(--green); font-size: 0.78em; margin-left: 0.1em; }
 .lead { margin: 4px 0 10px; font-size: clamp(13px, 3.2vw, 16px); line-height: 1.6; }
 .lead .poison { color: var(--purple); }
+.lead .gold-t { color: #c98a00; }
+.legend li.gold { background: linear-gradient(#fff9dc, #ffeea8); border-color: #a86a00; }
 
 .legend { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px; padding: 0; }
 .legend li { display: grid; grid-template-columns: 56px 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; text-align: left; padding: 6px 8px; background: #fff; border: 3px solid var(--ink); border-radius: 16px; font-size: 13px; }
