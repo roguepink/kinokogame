@@ -187,6 +187,8 @@ function buildWorld(seed) {
       if (waterNear(x, y, 120) || tooClose(x, y, 90, 0) || (inClear(x, y, 90) && !(Math.hypot(x - W.start.x, y - W.start.y) < 600))) continue;
       push({ kind: 'tent', x, y, r: 30, hgt: 80, hw: 50, v: Math.floor(R(0, 2)), s: 1 });
       push({ kind: 'fire', x: x + 62, y: y + 14, r: 11, hgt: 50, hw: 30, s: 1 });
+      push({ kind: 'line', x: x - 70, y: y + 30, r: 6, hgt: 70, hw: 50, s: 1 });
+      push({ kind: 'col', x: x - 10, y: y + 30, r: 6, low: true });
       addLog(x + 62, y - 28, -0.3, 0, 0.85);
       addLog(x + 44, y + 48, 0.25, 1, 0.85);
       W.camps.push({ x, y });
@@ -196,29 +198,50 @@ function buildWorld(seed) {
   }
 
   // 木: まず森の塊(グローブ)、次に点在する木、最後にマップ外周の木の壁
-  const addTree = (x, y, s, gap, wm) => {
-    const pine = rng() < 0.3;
+  // 地域で木の種類が変わる: 川や池のそばは柳、山ぎわは針葉樹、それ以外は広葉樹
+  const nearWaterFor = (x, y, d) => waterNear(x, y, d);
+  const mountainsNear = (x, y) => y < 420 || W.obstacles.some((o) => o.kind === 'mountain' && Math.hypot(o.x - x, o.y - y) < 420);
+  const addTree = (x, y, s, gap, wm, forceKind) => {
+    let kind = forceKind;
+    if (!kind) {
+      const q = rng();
+      if (nearWaterFor(x, y, 150)) kind = q < 0.55 ? 'willow' : q < 0.85 ? 'tree' : 'pine';
+      else if (mountainsNear(x, y)) kind = q < 0.72 ? 'pine' : 'tree';
+      else kind = q < 0.22 ? 'pine' : q < 0.27 ? 'dead' : 'tree';
+    }
+    const pine = kind === 'pine';
     const o = {
-      kind: pine ? 'pine' : 'tree', x, y, s,
-      r: (pine ? 11 : 13) * s, hgt: (pine ? 125 : 135) * s, hw: 58 * s,
-      v: pine ? Math.floor(R(0, 2)) : (() => { const q = rng(); return q < 0.5 ? 0 : q < 0.78 ? 1 : q < 0.93 ? 2 : 3; })(),
+      kind, x, y, s,
+      r: (pine ? 11 : kind === 'dead' ? 10 : 13) * s, hgt: (pine ? 125 : kind === 'willow' ? 150 : kind === 'dead' ? 120 : 135) * s, hw: (kind === 'willow' ? 70 : 58) * s,
+      v: pine ? Math.floor(R(0, 2)) : kind === 'willow' ? Math.floor(R(0, 2)) : kind === 'dead' ? 0 : (() => { const q = rng(); return q < 0.5 ? 0 : q < 0.78 ? 1 : q < 0.93 ? 2 : 3; })(),
     };
     const p = place(o, gap, wm);
     if (p) W.trees.push(p);
     return p;
   };
-  for (let g = 0; g < 30; g++) {
-    const gx = R(250, S - 250);
-    const gy = R(250, S - 250);
-    const rad = R(150, 330);
-    const cnt = Math.floor(R(12, 30));
+  // 大木のまわりに 若木が集まる
+  const addGrove = (gx, gy, rad, cnt) => {
+    const big = addTree(gx, gy, R(1.3, 1.5), 30, 30);
     for (let i = 0; i < cnt; i++) {
       const a = R(0, TAU);
       const d = Math.sqrt(rng()) * rad;
-      addTree(gx + Math.cos(a) * d, gy + Math.sin(a) * d, R(0.8, 1.05), 24, 26);
+      const sz = d < rad * 0.4 ? R(0.95, 1.15) : R(0.65, 0.95);
+      addTree(gx + Math.cos(a) * d, gy + Math.sin(a) * d, sz, 22, 26);
+    }
+    return big;
+  };
+  for (let g = 0; g < 30; g++) addGrove(R(250, S - 250), R(250, S - 250), R(150, 330), Math.floor(R(12, 28)));
+  for (let i = 0; i < 700; i++) addTree(R(100, S - 100), R(100, S - 100), R(0.7, 1.05), 40, 30);
+  // 川沿いの柳と葦
+  for (const river of W.rivers) {
+    for (let i = 6; i < river.path.length - 6; i += 9) {
+      const pt = river.path[i]; const q = river.path[i + 3];
+      const a = Math.atan2(q.y - pt.y, q.x - pt.x) + Math.PI / 2;
+      const side = rng() < 0.5 ? -1 : 1;
+      const off = river.w / 2 + R(40, 90);
+      addTree(pt.x + Math.cos(a) * off * side, pt.y + Math.sin(a) * off * side, R(0.9, 1.25), 26, 24, rng() < 0.7 ? 'willow' : 'tree');
     }
   }
-  for (let i = 0; i < 800; i++) addTree(R(100, S - 100), R(100, S - 100), R(0.75, 1.05), 40, 30);
   for (let t = 40; t < S - 40; t += 52) {
     for (const inset of [34, 92]) {
       addTree(t + R(-10, 10), inset + R(-8, 8), R(1.0, 1.2), 14, 20);
@@ -281,6 +304,20 @@ function buildWorld(seed) {
     if (W.tileAt(x, y) !== T_LAND) continue;
     addDecor('pebble', x, y, Math.floor(R(0, 3)));
   }
+  // 川岸の石と砂
+  for (const river of W.rivers) {
+    for (let i = 2; i < river.path.length - 2; i += 2) {
+      const pt = river.path[i]; const q = river.path[i + 2];
+      const a = Math.atan2(q.y - pt.y, q.x - pt.x) + Math.PI / 2;
+      for (const side of [-1, 1]) {
+        if (rng() < 0.45) continue;
+        const off = river.w / 2 + R(4, 16);
+        const x = pt.x + Math.cos(a) * off * side; const y = pt.y + Math.sin(a) * off * side;
+        if (W.tileAt(x, y) === T_LAND) addDecor(rng() < 0.6 ? 'pebble' : 'bankstone', x, y, Math.floor(R(0, 3)));
+      }
+    }
+  }
+  for (const pd of W.ponds) for (let i = 0; i < 10; i++) { const a = R(0, TAU); const x = pd.x + Math.cos(a) * (pd.rx + R(4, 14)); const y = pd.y + Math.sin(a) * (pd.ry + R(4, 14)); if (W.tileAt(x, y) === T_LAND) addDecor('bankstone', x, y, Math.floor(R(0, 3))); }
   // 木の根もと: シダ・おちば・小さなキノコ
   for (const t of W.trees) {
     if (rng() < 0.45) { const a = R(0.2, Math.PI - 0.2); addDecor('fern', t.x + Math.cos(a) * R(24, 40) * t.s, t.y + Math.sin(a) * R(10, 22) * t.s + 4, Math.floor(R(0, 2))); }

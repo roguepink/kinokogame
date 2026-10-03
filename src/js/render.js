@@ -178,6 +178,7 @@ const Render = (() => {
 
   function drawFire(ctx, o, t) {
     const S = Art.S;
+    if (Math.random() < 0.08) addParticle({ x: o.x + rr(-4, 4), y: o.y - 30, vx: rr(6, 16), vy: -rr(18, 30), ay: -6, drag: 0.4, life: rr(2.2, 3.4), max: 3.4, size: rr(5, 8), grow: 7, color: 'rgba(230,230,230,0.35)', shape: 'dust', rot: 0, vr: 0 });
     ctx.save(); ctx.globalAlpha = 0.75 + Math.sin(t * 9 + o.ph) * 0.15;
     Art.blit(ctx, S.glowWarm, o.x, o.y - 14, 1.2);
     ctx.restore();
@@ -258,6 +259,9 @@ const Render = (() => {
     switch (o.kind) {
       case 'mushroom': drawMushroom(ctx, o, t); break;
       case 'crate': ctx.save(); ctx.translate(o.x, o.y); Art.drawCrate(ctx, o, t); ctx.restore(); break;
+      case 'sprinkler': ctx.save(); ctx.translate(o.x, o.y); Art.drawSprinkler(ctx, o.o, t); ctx.restore(); break;
+      case 'bomb': ctx.save(); ctx.translate(o.x, o.y); Art.drawBomb(ctx, o.o, t); ctx.restore(); break;
+      case 'boomdrop': ctx.save(); ctx.translate(o.x, o.y - 6 - Math.abs(Math.sin(t * 3)) * 3); ctx.rotate(0.6); Art.drawBoomerang(ctx, 1, false); ctx.restore(); break;
       case 'boss': {
         ctx.save(); ctx.translate(o.x, o.y);
         if (o.dead) ctx.globalAlpha = Math.max(0, 1 - (t % 100) * 0); // 消えるまでそのまま
@@ -279,6 +283,7 @@ const Render = (() => {
         if (o.type === 'boar') { ctx.scale(dir * sq * CH, (2 - sq) * CH); Art.drawBoar(ctx, o, t); }
         else { ctx.scale(sq * CH, (2 - sq) * CH); if (o.type === 'bear') Art.drawBear(ctx, o, t); else Art.drawGorilla(ctx, o, t); }
         ctx.restore();
+        if (o.state === 'ally') { ctx.save(); ctx.translate(o.x, o.y - 100 + Math.sin(t * 5) * 3); heartPath(ctx, 0, 0, 8); ctx.fillStyle = '#ff8ad0'; ctx.fill(); ctx.lineWidth = 1.8; ctx.strokeStyle = OUT; ctx.stroke(); ctx.restore(); }
         break;
       }
       case 'player': {
@@ -297,11 +302,8 @@ const Render = (() => {
         ctx.scale(sq * CH, (2 - sq) * CH);
         Art.drawBoy(ctx, o, t);
         ctx.restore();
-        if (G.weapon === 'charge' && G.charge > 0) {
-          const k = clamp(G.charge / Features.C.weapons.charge.need, 0, 1);
-          ctx.fillStyle = 'rgba(40,20,50,0.7)'; ctx.fillRect(o.x - 22, o.y - 72, 44, 7);
-          ctx.fillStyle = k >= 1 ? '#fff' : '#4fc3ff'; ctx.fillRect(o.x - 20.5, o.y - 70.5, 41 * k, 4);
-        }
+        if ((o.inkT || 0) > 0) { ctx.save(); ctx.globalAlpha = Math.min(1, o.inkT * 2); for (const [x, y, r] of [[-8, -30, 7], [6, -40, 6], [10, -18, 6], [-4, -12, 5]]) { ctx.fillStyle = '#ff3d9a'; ctx.beginPath(); ctx.arc(o.x + x, o.y + y, r, 0, TAU); ctx.fill(); } ctx.restore(); }
+        if (G.weapon === 'boomerang' && (G.boomLv || 1) > 1) { ctx.font = `800 13px ${FONT}`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.strokeText('Lv' + G.boomLv, o.x, o.y - 70); ctx.fillStyle = '#ffe14d'; ctx.fillText('Lv' + G.boomLv, o.x, o.y - 70); }
         break;
       }
       default: break;
@@ -312,6 +314,9 @@ const Render = (() => {
     const S = Art.S;
     switch (o.kind) {
       case 'tree': case 'pine': drawTree(ctx, o, t, fade); break;
+      case 'willow': ctx.save(); ctx.translate(o.x, o.y); ctx.transform(1, 0, -Math.sin(t * 1.0 + o.ph) * 0.03, 1, 0, 0); if (fade) ctx.globalAlpha = 0.5; Art.blit(ctx, S.willow[o.v], 0, 0, o.s); ctx.restore(); break;
+      case 'dead': if (fade) ctx.globalAlpha = 0.5; Art.blit(ctx, S.dead, o.x, o.y, o.s); ctx.globalAlpha = 1; break;
+      case 'line': Art.blit(ctx, S.line, o.x, o.y, 1); break;
       case 'bush': Art.blit(ctx, S.bush[o.v], o.x, o.y, o.s); break;
       case 'rock': Art.blit(ctx, S.rock[o.v][o.moss ? 1 : 0], o.x, o.y, o.s); break;
       case 'stump': Art.blit(ctx, S.stump, o.x, o.y, o.s); break;
@@ -376,7 +381,30 @@ const Render = (() => {
     gr.addColorStop(0, inner); gr.addColorStop(1, outer);
     ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.85, 0, 0, TAU); ctx.fill();
   }
+  function drawWeaponGround(ctx, t) {
+    // ローラーの帯
+    const bands = G.bands || [];
+    if (bands.length) {
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (const pass of [[1.0, 'rgba(196,18,106,0.55)', 4], [0.86, 'rgba(255,61,154,0.85)', 0], [0.4, 'rgba(255,150,205,0.6)', -3]]) {
+        ctx.beginPath();
+        let prev = null;
+        for (const b of bands) {
+          const a = Math.min(1, b.life / 1.5);
+          if (a <= 0) continue;
+          if (prev && Math.hypot(prev.x - b.x, prev.y - b.y) < 40) ctx.lineTo(b.x, b.y + pass[2]); else ctx.moveTo(b.x, b.y + pass[2]);
+          prev = b;
+        }
+        ctx.lineWidth = Features.C.weapons.roller.r * 2 * pass[0]; ctx.strokeStyle = pass[1]; ctx.stroke();
+      }
+    }
+    for (const z of G.mists || []) {
+      const a = Math.min(1, z.life / 1.2) * (0.35 + Math.sin(t * 2 + z.t) * 0.06);
+      zone(ctx, z.x, z.y, z.r, `rgba(225,242,255,${a})`, 'rgba(225,242,255,0)');
+    }
+  }
   function drawZones(ctx, t) {
+    drawWeaponGround(ctx, t);
     for (const z of G.taints || []) { const a = Math.min(1, z.life / 5) * 0.5; zone(ctx, z.x, z.y, z.r, `rgba(120,40,170,${a})`, 'rgba(120,40,170,0)'); }
     const ev = G.ev;
     if (ev) {
@@ -504,6 +532,13 @@ const Render = (() => {
       for (let i = 0; i < 5; i++) { const a = (i / 5) * TAU; Art.circ(ctx, Math.cos(a) * 8, Math.sin(a) * 8, 2, '#c35cff', 0); }
       ctx.restore();
     }
+    const bm = G.boom;
+    if (bm) {
+      ctx.fillStyle = 'rgba(30,60,40,0.22)'; ctx.beginPath(); ctx.ellipse(bm.x, bm.y + 10, 12 + bm.lv * 3, 5, 0, 0, TAU); ctx.fill();
+      ctx.save(); ctx.translate(bm.x, bm.y); ctx.rotate(bm.rot);
+      Art.drawBoomerang(ctx, bm.lv, bm.gold);
+      ctx.restore();
+    }
     for (const p of G.proj) {
       if (p.pierce) {
         ctx.save(); ctx.translate(p.x, p.y - p.h); ctx.rotate(Math.atan2(p.vy, p.vx));
@@ -528,7 +563,8 @@ const Render = (() => {
       ctx.beginPath(); ctx.moveTo(p.x - p.vx * 0.06, p.y - p.h - p.vy * 0.06); ctx.lineTo(p.x, p.y - p.h); ctx.stroke();
       ctx.strokeStyle = p.gold ? 'rgba(255,240,170,0.8)' : 'rgba(255,120,190,0.7)'; ctx.lineWidth = 4;
       ctx.beginPath(); ctx.moveTo(p.x - p.vx * 0.035, p.y - p.h - p.vy * 0.035); ctx.lineTo(p.x, p.y - p.h); ctx.stroke();
-      Art.blit(ctx, p.gold ? S.goldball : S.inkball, p.x, p.y - p.h, p.gold ? 1.25 : 1.05);
+      if (p.rainbow) { const hue = (p.t * 720) % 360; ctx.fillStyle = `hsl(${hue},95%,65%)`; ctx.beginPath(); ctx.arc(p.x, p.y - p.h, 7, 0, TAU); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6; ctx.stroke(); continue; }
+      Art.blit(ctx, p.gold ? S.goldball : S.inkball, p.x, p.y - p.h, p.small ? 0.7 : p.wet ? 1.4 : p.gold ? 1.25 : 1.05);
     }
   }
 
@@ -602,6 +638,7 @@ const Render = (() => {
         case 'reed': Art.blit(ctx, S.reed[d.v], d.x, d.y, 1); break;
         case 'fern': Art.blit(ctx, S.fern[d.v], d.x, d.y, 1.1); break;
         case 'shroomlet': Art.blit(ctx, S.shroomlet[d.v], d.x, d.y, 1); break;
+        case 'bankstone': Art.blit(ctx, S.bankstone[d.v], d.x, d.y, 1); break;
         case 'leaf': ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot); Art.blit(ctx, S.leaf[d.v], 0, 0, 1); ctx.restore(); break;
         default: break;
       }
@@ -622,6 +659,25 @@ const Render = (() => {
     drawTelegraphs(ctx, t);
     mark('decals');
 
+    // 太陽の向きの長い影(木・岩・山)。夕方は長く、夜は消える
+    {
+      const eve = G.eve || 0; const night = G.night || 0;
+      const len = 1 + eve * 1.4; const alpha = (1 - night) * (0.9 - eve * 0.2);
+      if (alpha > 0.05) {
+        ctx.save(); ctx.globalAlpha = alpha;
+        const img = S.longShadow.c;
+        W.hash.query(left - 300, top - 300, right + 100, bottom + 100, (o) => {
+          // 木と山だけ(小物は接地の影で十分)
+          if (!(o.kind === 'tree' || o.kind === 'pine' || o.kind === 'willow' || o.kind === 'dead' || o.kind === 'mountain' || o.kind === 'tent')) return;
+          const hw = (o.hw || 30) * 0.9; const hgt = (o.hgt || 60);
+          const sx = o.x + hgt * 0.4 * len; const sy = o.y + 10 + hgt * 0.12 * len;
+          const rx = hgt * 0.48 * len; const ry = hw * 0.4;
+          if (sx + rx < left || sx - rx > right || sy + ry < top || sy - ry > bottom) return;
+          ctx.drawImage(img, sx - rx, sy - ry, rx * 2, ry * 2);
+        });
+        ctx.restore();
+      }
+    }
     // 奥から手前へ並べて描く物体
     drawList.length = 0;
     W.hash.query(left - 240, top - 40, right + 240, bottom + 400, (o) => {
@@ -633,12 +689,15 @@ const Render = (() => {
     for (const c of G.critters) if (!c.gone && c.x > left - 60 && c.x < right + 60 && c.y > top - 60 && c.y < bottom + 60) drawList.push(c);
     for (const e of G.enemies) if (e.x > left - 120 && e.x < right + 120 && e.y > top - 120 && e.y < bottom + 160) drawList.push(e);
     for (const c of G.crates || []) if (c.x > left - 60 && c.x < right + 60 && c.y > top - 60 && c.y < bottom + 60) drawList.push(c);
+    for (const sp of G.sprinklers || []) drawList.push({ kind: 'sprinkler', x: sp.x, y: sp.y, o: sp });
+    for (const bm of G.bombs || []) if (!bm.done) drawList.push({ kind: 'bomb', x: bm.x, y: bm.y, o: bm });
+    if (G.boomDrop) drawList.push({ kind: 'boomdrop', x: G.boomDrop.x, y: G.boomDrop.y, o: G.boomDrop });
     if (G.boss) drawList.push(G.boss);
     drawList.push(P);
     drawList.sort((a, b) => a.y - b.y);
     mark('listbuild');
     for (const o of drawList) {
-      if (o.kind === 'player' || o.kind === 'enemy' || o.kind === 'critter' || o.kind === 'mushroom' || o.kind === 'crate' || o.kind === 'boss') { drawEntityItem(ctx, o, t); continue; }
+      if (o.kind === 'player' || o.kind === 'enemy' || o.kind === 'critter' || o.kind === 'mushroom' || o.kind === 'crate' || o.kind === 'boss' || o.kind === 'sprinkler' || o.kind === 'bomb' || o.kind === 'boomdrop') { drawEntityItem(ctx, o, t); continue; }
       // プレイヤーが木やテントのかげに入ったら、木を半透明にして見えるようにする
       const fade = o.y > P.y && Math.abs(P.x - o.x) < (o.hw || 50) * 0.7 && P.y > o.y - (o.hgt || 60) * 0.95;
       drawObstacle(ctx, o, t, fade);
@@ -662,14 +721,15 @@ const Render = (() => {
     let red = G.flashRed > 0 ? clamp(G.flashRed / 0.4, 0, 1) * 0.9 : 0;
     if (G.state === 'playing' && P.hp > 0 && P.hp < 30) red = Math.max(red, 0.35 + 0.25 * Math.sin(t * 6));
     const purple = P.slowT > 0 ? Math.min(1, P.slowT) * (0.3 + 0.12 * Math.sin(t * 5)) : 0;
-    setFx(red, purple, G.night || 0, G.eve || 0);
+    setFx(red, purple, G.night || 0, G.eve || 0, G.state === 'title' ? 0.3 : clamp(1 - G.t / 14, 0, 1) * 0.38);
     if (G.state === 'playing') drawIndicators(ctx, V, t);
     mark('overlay');
   }
 
-  let fxNight = null; let fxEve = null;
-  function setFx(red, purple, night, eve) {
-    if (!fxRed) { fxRed = document.getElementById('fxRed'); fxPurple = document.getElementById('fxPurple'); fxNight = document.getElementById('fxNight'); fxEve = document.getElementById('fxEve'); }
+  let fxNight = null; let fxEve = null; let fxMist = null;
+  function setFx(red, purple, night, eve, mist) {
+    if (!fxRed) { fxRed = document.getElementById('fxRed'); fxPurple = document.getElementById('fxPurple'); fxNight = document.getElementById('fxNight'); fxEve = document.getElementById('fxEve'); fxMist = document.getElementById('fxMist'); }
+    if (fxMist && Math.abs(mist - (fxLast.m || 0)) > 0.01) { fxLast.m = mist; fxMist.style.opacity = mist.toFixed(2); }
     if (!fxRed) return;
     if (Math.abs(red - fxLast.r) > 0.02) { fxLast.r = red; fxRed.style.opacity = red.toFixed(2); }
     if (Math.abs(purple - fxLast.p) > 0.02) { fxLast.p = purple; fxPurple.style.opacity = purple.toFixed(2); }
@@ -732,7 +792,7 @@ const Render = (() => {
       }
     }
     for (const o of W.obstacles) {
-      if (o.kind === 'tree' || o.kind === 'pine') { g.fillStyle = '#3f9a56'; g.fillRect(o.x / u - 0.9, o.y / u - 0.9, 1.8, 1.8); }
+      if (o.kind === 'tree' || o.kind === 'pine' || o.kind === 'willow' || o.kind === 'dead') { g.fillStyle = o.kind === 'dead' ? '#8a7a60' : '#3f9a56'; g.fillRect(o.x / u - 0.9, o.y / u - 0.9, 1.8, 1.8); }
       else if (o.kind === 'mountain') {
         g.fillStyle = '#9aa5c9'; g.beginPath(); g.moveTo(o.x / u - o.hw / u, o.y / u + 2); g.lineTo(o.x / u, o.y / u - o.hw / u * 1.2); g.lineTo(o.x / u + o.hw / u, o.y / u + 2); g.closePath(); g.fill();
         g.fillStyle = '#fff'; g.beginPath(); g.moveTo(o.x / u - 2, o.y / u - o.hw / u * 0.8); g.lineTo(o.x / u, o.y / u - o.hw / u * 1.2); g.lineTo(o.x / u + 2, o.y / u - o.hw / u * 0.8); g.fill();

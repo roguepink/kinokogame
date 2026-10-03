@@ -9,7 +9,7 @@ const UI = {
   last: {},
   init() {
     for (const id of ['hud', 'hpFill', 'hpText', 'score', 'combo', 'comboN', 'comboM', 'comboFill', 'chips', 'timer', 'btnSound', 'btnPause', 'toast', 'banner', 'hint',
-      'title', 'pause', 'result', 'touchHints', 'thL', 'thR', 'event', 'eventText', 'eventFill', 'bossBar', 'bossFill', 'mission', 'missionText', 'missionProg', 'hiscores', 'todayForest', 'btnStart', 'btnResume', 'btnQuit', 'btnRetry', 'btnToTitle', 'bestTitle', 'resTitle', 'resRank', 'resMsg', 'resScore', 'resNew', 'resStats']) {
+      'title', 'pause', 'result', 'touchHints', 'thL', 'thR', 'event', 'eventText', 'eventFill', 'bossBar', 'bossFill', 'mission', 'missionText', 'missionProg', 'hiscores', 'todayForest', 'dailyBox', 'loopBox', 'loopChk', 'resMeta', 'cntCodex', 'cntAch', 'cntPts', 'btnStart', 'btnResume', 'btnQuit', 'btnRetry', 'btnToTitle', 'bestTitle', 'resTitle', 'resRank', 'resMsg', 'resScore', 'resNew', 'resStats']) {
       this.el[id] = $(id);
     }
   },
@@ -41,7 +41,7 @@ const UI = {
     const e = this.el;
     const hp = Math.ceil(P.hp);
     this.set('hp', hp, (v) => {
-      e.hpFill.style.width = (v / CONFIG.player.maxHp) * 100 + '%';
+      e.hpFill.style.width = Math.min(100, (v / (CONFIG.player.maxHp + (P.maxHpBonus || 0))) * 100) + '%';
       e.hpFill.className = 'hp-fill' + (v <= 30 ? ' low' : v <= 60 ? ' mid' : '');
       e.hpText.textContent = v;
     });
@@ -180,6 +180,13 @@ function showResult() {
   let [, letter, msg] = ranks.find((r) => G.score >= r[0]);
   if (G.stats.boss && letter !== 'S') { letter = String.fromCharCode(letter.charCodeAt(0) - 1); if (letter === '@') letter = 'S'; msg = 'ボスを たおした! ' + msg; }
   addToTable(G.score, letter); renderTable();
+  const meta = Meta.onGameEnd(G.score, letter);
+  let mh = `ポイント +${meta.gained}(ぜんぶで <b>${meta.pts}</b>pt)`;
+  mh += `<br>きょうのチャレンジ: ${meta.daily.text} → <b>${meta.daily.val}</b> ${meta.daily.star ? '<span class="new">★ たっせい!</span>' : ''}`;
+  if (meta.newAch.length) mh += '<br><span class="new">じっせき かくとく: ' + meta.newAch.map((a) => '「' + a.name + '」').join(' ') + '</span>';
+  if (meta.loopNew) mh += '<br><span class="new">「2周目の森」が あそべるように なった!</span>';
+  e.resMeta.innerHTML = mh;
+  refreshTitle();
   e.resRank.textContent = letter;
   e.resRank.style.background = letter === 'S' ? 'radial-gradient(circle at 35% 30%, #fff6a0, #ff5fb0)' : letter === 'A' ? 'radial-gradient(circle at 35% 30%, #ffe98a, #ff9d2e)' : letter === 'B' ? 'radial-gradient(circle at 35% 30%, #c8f5b0, #43c06a)' : 'radial-gradient(circle at 35% 30%, #d8e6ff, #7a9be0)';
   e.resMsg.textContent = msg;
@@ -192,6 +199,17 @@ function showResult() {
   UI.show('result', true);
 }
 
+// タイトル画面の数字(図鑑・実績・ポイント・日替わり)
+function refreshTitle() {
+  const e = UI.el;
+  e.cntCodex.textContent = Meta.codexCount() + '/' + Meta.CODEX.length;
+  e.cntAch.textContent = Meta.achCount() + '/' + Meta.ACH.length;
+  e.cntPts.textContent = Meta.pts() + 'pt';
+  const d = Meta.daily();
+  e.dailyBox.innerHTML = 'きょうのチャレンジ: <b>' + d.text + '</b>' + (d.best ? ' / きろく ' + d.best : '') + (d.star ? ' <span class="star">★</span>' : '');
+  e.loopBox.classList.toggle('hidden', !Meta.loopUnlocked());
+  e.loopChk.checked = Meta.loopOn();
+}
 function toTitle() {
   Sound.stopBgm();
   G.state = 'title'; G.paused = false;
@@ -201,6 +219,7 @@ function toTitle() {
   UI.show('title', true);
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');
   G.dispScore = 0;
+  refreshTitle();
 }
 
 function setPaused(p) {
@@ -360,12 +379,14 @@ function boot() {
   window.addEventListener('blur', () => { if (G.state === 'playing') setPaused(true); });
 
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');
-  for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gold', 'gold'], ['ic-boss', 'boss'], ['ic-crate', 'crate'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar']]) Art.drawIcon($(id), what);
+  document.querySelectorAll('[data-meta]').forEach((b) => b.addEventListener('click', () => { Sound.init(); Meta.openPanel(b.dataset.meta); }));
+  UI.el.loopChk.addEventListener('change', () => { Meta.setLoop(UI.el.loopChk.checked); resetGame(); });
+  refreshTitle();
+  // 説明のイラストは「あそびかた」を開いたときに描く(Meta.render)
 
-  drawMapIcon($('ic-map'));
 
   // 動作確認用: URL に ?debug を付けるとコンソールから状態を触れる
-  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, Features, purify, hitMushroom, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
+  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, Features, Meta, purify, hitMushroom, refreshTitle, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
 
   requestAnimationFrame(loop);
 }

@@ -173,6 +173,7 @@ function spawnGold() {
   const m = makeMushroom('gold', s.x, s.y, false);
   G.mushrooms.push(m);
   G.gold = m;
+  Meta.codexSee('gold');
   G.stats.goldSeen += 1;
   UI.toast('金色のキノコが あらわれた! にげる前に たおせ!', 3200);
   Sound.sfx.gold();
@@ -200,7 +201,9 @@ function spawnEnemy(far) {
   });
   if (!s) return null;
   const e = makeEnemy(pickEnemyType(), s.x, s.y);
+  if (G.loop) loopify(e);
   G.enemies.push(e);
+  Meta.codexSee(e.type);
   return e;
 }
 function respawnEnemy(e) {
@@ -236,11 +239,21 @@ function resetGame() {
   if (sp) { near.x = sp.x; near.y = sp.y; }
   for (let i = 0; i < CONFIG.director.start; i++) spawnEnemy(true);
   Features.reset();
+  Meta.applyStart();
+  if (G.loop) { for (const e of G.enemies) loopify(e); UI.toast('2周目の森: てきが つよい・金色が よく出る・スコア 1.5倍', 3600); }
 }
+// 2周目: 敵を強くする
+function loopify(e) {
+  if (e.looped) return;
+  e.looped = true;
+  e.def = Object.assign({}, e.def, { hp: Math.round(e.def.hp * 1.4), chase: e.def.chase * 1.2, wander: e.def.wander * 1.2, damage: Math.round(e.def.damage * 1.25) });
+  e.hp = e.def.hp; e.maxHp = e.def.hp;
+}
+const maxHp = () => CONFIG.player.maxHp + (G.player.maxHpBonus || 0);
 
 // ---------- スコア ----------
 // パワーアップ中は得点 2倍
-const scoreMul = () => (G.power > 0 ? CONFIG.power.scoreMul : 1);
+const scoreMul = () => (G.power > 0 ? CONFIG.power.scoreMul : 1) * (G.charmScore || 1) * (G.loop ? 1.5 : 1);
 function addScore(pts, x, y, color) {
   pts = Math.round(pts * scoreMul());
   G.score += pts;
@@ -255,6 +268,7 @@ function hurtPlayer(dmg, sx, sy, kb) {
     return false;
   }
   P.hp = Math.max(0, P.hp - dmg);
+  if (G.boss && !G.boss.dead) G.stats.bossHurt = true;
   P.invuln = CONFIG.player.invuln;
   P.hurtT = 0.5;
   const a = Math.atan2(P.y - sy, P.x - sx);
@@ -291,7 +305,7 @@ function updatePlayer(dt) {
 
   let mv = playing ? Input.move() : { x: 0, y: 0 };
   let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1) * Features.playerSpeedMul();
-  if (G.weapon === 'charge' && G.charge > 0) speed *= 0.55; // ためている間は足がおそい
+  if ((P.inkT || 0) > 0) P.inkT -= dt; // インクまみれ(ばくだんに巻きこまれた)
   const tx = mv.x * speed;
   const ty = mv.y * speed;
   P.vx = approach(P.vx, tx, C.accel * dt);
@@ -361,7 +375,7 @@ function assistAim(angle, strong) {
     if (diff < tol && diff * d < bestScore) { bestScore = diff * d; best = ang; }
   };
   for (const m of G.mushrooms) if (!m.dead && m.type !== 'good') test(m, m.hr);
-  for (const e of G.enemies) if (e.state !== 'flee') test(e, e.def.hr);
+  for (const e of G.enemies) if (e.state !== 'flee' && e.state !== 'ally') test(e, e.def.hr);
   if (best === null) return angle;
   return angle + angleDiff(angle, best) * 0.7;
 }
@@ -390,8 +404,9 @@ function updateProjectiles(dt) {
     p.life -= dt;
     p.t += dt;
     if (p.homing) homeProjectile(p, dt);
-    if (p.bubble) { p.ph += dt * 6; p.x += Math.cos(p.ph) * 30 * dt; p.y += Math.sin(p.ph) * 20 * dt; p.vx *= Math.exp(-0.5 * dt); p.vy *= Math.exp(-0.5 * dt); }
     p.x += p.vx * dt; p.y += p.vy * dt;
+    // 霧の中を通った弾は 2倍
+    if (!p.wet && (G.mists && G.mists.length) && Features.inMist(p.x, p.y)) { p.wet = true; p.dmg = (p.dmg || 1) * 2; }
     p.dropT += Math.hypot(p.vx, p.vy) * dt;
     if (!p.bubble) p.h = Math.max(4, p.h - dt * 14);
     if (p.dropT > 140) { p.dropT = 0; addDecal(p.x + rr(-5, 5), p.y + rr(-5, 5), 0.34, 'drop', 6); }
@@ -412,7 +427,7 @@ function updateProjectiles(dt) {
     if (!dead) {
       const extra = p.hr || 0;
       for (const e of G.enemies) {
-        if (e.state === 'flee') continue;
+        if (e.state === 'flee' || e.state === 'ally') continue;
         if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.hr + extra) {
           if (p.pierce) { if (!p.hit.has(e)) { p.hit.add(e); hitEnemy(e, p); } continue; }
           if (p.bubble) { dead = true; hitKind = 'bubble'; break; }
@@ -432,7 +447,6 @@ function updateProjectiles(dt) {
         if (Math.hypot(o.x - p.x, o.y - p.y) < o.r + 2) { dead = true; hitKind = 'wall'; }
       });
     }
-    if (dead && p.bubble) { Features.bubbleBurst(p); hitKind = 'bubble'; }
     if (dead) {
       if (!hitKind || hitKind === 'wall') {
         if (W.tileAt(p.x, p.y) === T_WATER) {
@@ -462,7 +476,7 @@ function homeProjectile(p, dt) {
     bestD = d; best = o;
   };
   for (const m of G.mushrooms) if (!m.dead && m.type !== 'good') test(m);
-  for (const e of G.enemies) if (e.state !== 'flee') test(e);
+  for (const e of G.enemies) if (e.state !== 'flee' && e.state !== 'ally') test(e);
   if (!best) return;
   const want = Math.atan2(best.y - (best.kind === 'enemy' ? 10 : 0) - p.y, best.x - p.x);
   const na = a + clamp(angleDiff(a, want), -CONFIG.power.homing * dt, CONFIG.power.homing * dt);
@@ -478,9 +492,8 @@ function hitMushroom(m, p) {
   if (m.type === 'gold') { m.dashT = 0.45; m.dir = Math.atan2(p.vy, p.vx) + rr(-0.8, 0.8); } // 当たると飛びのく
   burst(p.x, p.y - 8, 8, { dir: Math.atan2(p.vy, p.vx), spread: 2.4, s0: 50, s1: 160, l0: 0.25, l1: 0.5, z0: 1.8, z1: 4, color: p.gold ? ['#ffe14d', '#fff6a8', '#fff'] : ['#ff3d9a', '#ff9ad0', '#c35cff'], shape: 'ink', ay: 260 });
   addDecal(m.x + rr(-10, 10), m.y + rr(-4, 8), 0.55, p.gold ? 'gsplat' : 'splat', 12);
-  G.cam.shake = Math.max(G.cam.shake, 2.2);
-  Sound.sfx.splat();
-  if (m.hp <= 0) purify(m); else G.hitStop = Math.max(G.hitStop, 0.025);
+  if (!p.quiet) { G.cam.shake = Math.max(G.cam.shake, 2.2); Sound.sfx.splat(); }
+  if (m.hp <= 0) purify(m); else if (!p.quiet) G.hitStop = Math.max(G.hitStop, 0.025);
 }
 
 function purify(m) {
@@ -508,6 +521,8 @@ function purify(m) {
   G.hitStop = Math.max(G.hitStop, big ? 0.1 : 0.055);
   Sound.sfx.pop(G.combo);
   Features.onPurify(m);
+  Meta.codexKill(gold ? 'gold' : m.big ? 'big' : 'poison');
+  if (gold && (G.night || 0) > 0.3) G.stats.nightGold = (G.stats.nightGold || 0) + 1;
   if (gold) { G.gold = null; G.goldT = CONFIG.mushroom.goldEvery; G.stats.gold += 1; activatePower(); }
 }
 
@@ -535,13 +550,14 @@ function hitEnemy(e, p) {
   G.cam.shake = Math.max(G.cam.shake, 1.8);
   Sound.sfx.hitEnemy();
   if (e.state === 'wander' && e.cool <= 0.5) { e.state = 'chase'; e.st = 0; e.seen = true; }
-  if (e.hp <= 0) defeatEnemy(e, false);
+  if (e.hp <= 0) { if (p.rainbow) Features.makeAlly(e); else defeatEnemy(e, false); }
 }
 
 // 敵を撃退: インクまみれで逃げていく。ram=true は体当たり(パワーアップ中)
 function defeatEnemy(e, ram) {
   e.state = 'flee'; e.st = 0; e.z = 0; e.hitDone = true; e.hp = 0;
   G.stats.inked += 1;
+  Meta.codexKill(e.type);
   if (ram) {
     G.stats.rams += 1;
     const P = G.player;
@@ -583,6 +599,7 @@ function steer(e, dx, dy, speed, dt) {
 
 function noticePlayer(e) {
   e.state = 'chase'; e.st = 0; e.loseT = 0; e.seen = true;
+  Meta.codexSee(e.type);
   floatText(e.x, e.y - 84, '!', '#ff4d4d', 30);
   if (G.alertCd <= 0) { Sound.sfx.alert(); G.alertCd = 1.2; }
   if (!G.shownHints[e.type]) {
@@ -735,6 +752,7 @@ function updateEnemy(e, dt) {
     case 'stun':
       if (e.st >= e.dur) { e.state = 'chase'; e.st = 0; e.cool = 0.6; }
       break;
+    case 'ally': Features.updateAlly(e, dt); break;
     case 'flee': {
       const a = Math.atan2(-dy, -dx);
       steer(e, Math.cos(a), Math.sin(a), def.chase * 1.5, dt);
@@ -744,7 +762,7 @@ function updateEnemy(e, dt) {
     default: break;
   }
   // パワーアップ中は体当たりでふっとばす
-  if (G.power > 0 && e.state !== 'flee' && d < def.cr + P.r + 8 && e.z < 30) { defeatEnemy(e, true); return; }
+  if (G.power > 0 && e.state !== 'flee' && e.state !== 'ally' && d < def.cr + P.r + 8 && e.z < 30) { defeatEnemy(e, true); return; }
   // プレイヤーと体が重ならないように押し返す
   const min = def.cr + P.r;
   if (d < min && d > 0.01 && e.state !== 'flee' && e.z < 10) {
@@ -816,6 +834,7 @@ function updateCritter(c, dt) {
     c.rest -= dt;
     if (c.rest <= 0) startHop(c, d, dx, dy);
   }
+  if (!c.seen && d < 240) { c.seen = true; Meta.codexSee(c.type); }
   if (G.state === 'playing' && d < P.r + 11) collectCritter(c);
 }
 function collectCritter(c) {
@@ -863,6 +882,7 @@ function updateGold(m, dt, d, dx, dy) {
   }
   let speed = scared ? C.goldSpeed : C.goldSpeed * 0.35;
   if (m.dashT > 0) speed = C.goldSpeed * 1.7;
+  if ((m.mistT || 0) > 0) { m.mistT -= dt; speed *= 0.4; }
   if (!scared && m.pauseT > 0) speed = 0;
   // ゆらゆら走る
   const wob = scared ? Math.sin(m.t * 9) * 0.35 : 0;
@@ -891,6 +911,7 @@ function updateMushroom(m, dt) {
   const dy = P.y - m.y;
   const d = Math.hypot(dx, dy);
   if (m.type === 'gold') { if (!m.dead && G.state === 'playing') updateGold(m, dt, d, dx, dy); return; }
+  if (!m.seen && d < 260) { m.seen = true; Meta.codexSee(m.type === 'poison' && m.big ? 'big' : m.type); }
   if (m.hidden && d < CONFIG.mushroom.revealRadius) {
     m.hidden = false;
     burst(m.x, m.y - 14, 6, { s0: 20, s1: 70, l0: 0.4, l1: 0.7, z0: 2, z1: 4, color: ['#c35cff', '#e2b0ff'], shape: 'spark', ay: -30 });
@@ -909,14 +930,15 @@ function updateMushroom(m, dt) {
   if (G.state !== 'playing' || m.dead) return;
   if (d < P.r + 13 * m.size) {
     if (m.type === 'good') {
-      if (P.hp >= CONFIG.player.maxHp) {
+      if (P.hp >= maxHp()) {
         if (G.fullHintT <= 0) { floatText(P.x, P.y - 60, 'HPまんたん!', '#bfffc9', 20); G.fullHintT = 2.5; }
         return;
       }
       m.dead = true;
-      const heal = Math.min(CONFIG.player.heal, CONFIG.player.maxHp - P.hp);
+      const heal = Math.min(CONFIG.player.heal, maxHp() - P.hp);
       P.hp += heal;
       G.stats.eaten += 1;
+      Meta.codexKill('good');
       floatText(P.x, P.y - 60, 'おいしい! HP+' + heal, '#9dffb0', 22);
       burst(P.x, P.y - 30, 12, { s0: 30, s1: 90, l0: 0.7, l1: 1.2, z0: 6, z1: 9, color: '#ff8fb8', shape: 'heart', ay: -60 });
       burst(P.x, P.y - 30, 10, { s0: 40, s1: 120, l0: 0.4, l1: 0.8, z0: 2.5, z1: 5, color: ['#bfffc9', '#fff6a8'], shape: 'spark' });
@@ -966,7 +988,7 @@ function updateDirector(dt) {
     G.spawnT = (G.spawnT || 0) - dt;
     if (G.spawnT <= 0) { G.spawnT = 1.5; spawnEnemy(false); }
   }
-  if (!G.gold) { G.goldT -= dt; if (G.goldT <= 0) { if (!spawnGold()) G.goldT = 3; } }
+  if (!G.gold) { G.goldT -= dt * (G.loop ? 1.8 : 1); if (G.goldT <= 0) { if (!spawnGold()) G.goldT = 3; } }
   G.mushT -= dt;
   if (G.mushT <= 0) {
     G.mushT = 1.2;
