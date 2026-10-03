@@ -103,6 +103,8 @@ const Sound = (() => {
     bossRoar() { noise(0.9, 0.16, 400, 'lowpass'); tone(70, 0.9, 'sawtooth', 0.14, 40); tone(140, 0.6, 'square', 0.05, 60, 0.1); },
     spore() { for (let i = 0; i < 4; i++) tone(500 + i * 90, 0.08, 'sine', 0.05, 300, i * 0.05); },
     bossDown() { [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => { tone(f, 0.35, 'triangle', 0.1, null, i * 0.09); tone(f * 2, 0.3, 'sine', 0.05, null, i * 0.09); }); noise(0.6, 0.12, 1200, 'lowpass'); tone(50, 0.8, 'sine', 0.25, 30); },
+    rifle() { noise(0.12, 0.16, 2200, 'highpass'); tone(140, 0.18, 'square', 0.12, 50); tone(900, 0.08, 'sine', 0.05, 300); },
+    shotgun() { noise(0.25, 0.22, 900, 'lowpass'); tone(90, 0.25, 'sawtooth', 0.14, 40); noise(0.08, 0.1, 4000, 'highpass'); },
     missile() { noise(0.2, 0.1, 1200, 'bandpass'); tone(200, 0.3, 'sawtooth', 0.08, 900); },
     powerEnd() { [784, 659, 523].forEach((f, i) => tone(f, 0.2, 'triangle', 0.08, null, i * 0.12)); },
   };

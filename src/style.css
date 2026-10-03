@@ -159,6 +159,18 @@ body.touch .controls .touch-only { display: block; }
 .sub-btn { padding: 4px 22px 5px; font-size: 15px; color: var(--ink); background: #fff; box-shadow: 0 4px 0 var(--ink); }
 .sub-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
 
+/* ---------- ステージ選択 ---------- */
+.stages { display: flex; justify-content: center; gap: 10px; margin: 2px 0 6px; }
+.stage-btn { position: relative; min-width: 120px; padding: 6px 14px 8px; font-family: inherit; font-weight: 800; color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 rgba(53, 40, 63, 0.5); cursor: pointer; text-align: center; }
+.stage-btn b { display: block; font-size: 15px; }
+.stage-btn span { display: block; font-size: 13px; color: var(--green); }
+.stage-btn i { display: none; font-style: normal; font-size: 10px; color: #a33; }
+.stage-btn.on { background: #ffe9c2; border-color: var(--orange); }
+.stage-btn.lock { background: #eee; color: #888; }
+.stage-btn.lock span { color: #999; }
+.stage-btn.lock i { display: block; }
+.stage-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(53, 40, 63, 0.5); }
+
 /* ---------- タイトルのやりこみ ---------- */
 .daily { margin: 2px 0 4px; padding: 3px 12px; font-size: 13px; background: #fff; border: 3px solid var(--ink); border-radius: 14px; display: inline-block; }
 .daily b { color: var(--pink); }

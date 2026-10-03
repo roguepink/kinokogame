@@ -540,6 +540,19 @@ const Art = (() => {
     if (Math.cos(aim) < 0) g.scale(1, -1);
     const k = -recoil * 5.5;
     g.rotate(-recoil * 0.18 * (Math.cos(aim) < 0 ? -1 : 1));
+    if (typeof G !== 'undefined' && G.stage === 2) {
+      // まち: ピストル(武器で色が変わる)
+      const wc2 = (G.weapon && typeof Features !== 'undefined') ? Features.C.weapons[G.weapon].color : null;
+      rrect(g, -1 + k, -3.2, 10, 6.4, 3, SKIN, 1.8);
+      const long = G.weapon === 'rifle';
+      rrect(g, 6 + k, -4.5, long ? 34 : 20, 8, 3, wc2 ? wc2 : '#4a4f5c', 2);
+      rrect(g, 8 + k, 2, 7, 9, 2, '#6b4a2a', 1.8);
+      g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(8 + k, -3.5, long ? 30 : 16, 2);
+      if (G.weapon === 'shotgun') rrect(g, 14 + k, -7.5, 18, 4, 2, '#6b4a2a', 1.6);
+      circ(g, 8 + k, 1.5, 3, SKIN, 1.6);
+      g.restore();
+      return;
+    }
     rrect(g, -1 + k, -3.2, 10, 6.4, 3, SKIN, 1.8);                  // うで
     rrect(g, 6 + k, -4, 19, 8.4, 3, '#fdfdff', 2);                  // 本体
     const wc = (typeof G !== 'undefined' && G.weapon && typeof Features !== 'undefined') ? Features.C.weapons[G.weapon].color : null;
@@ -1211,6 +1224,11 @@ const Art = (() => {
     else if (what === 'good') blit(g, S.mush.good[0], 0, 0);
     else if (what === 'boss') { g.scale(0.36, 0.36); g.translate(0, 0); drawBoss(g, { weak: 1, wob: 0, intro: 0, flash: 0 }, 0.5); }
     else if (what === 'crate') { g.scale(1.3, 1.3); drawCrate(g, { w: 'missile', t: 0 }, 0.4); }
+    else if (what === 'thief') { g.scale(1.3, 1.3); Town.drawThief(g, fake, 0.3); }
+    else if (what === 'zombie') { g.scale(1.25, 1.25); Town.drawZombie(g, fake, 0.3); }
+    else if (what === 'yankee') { g.scale(1.2, 1.2); Town.drawYankee(g, fake, 0.3); }
+    else if (what === 'bossy') { g.scale(0.48, 0.48); Town.drawBossYankee(g, { weak: 1, wob: 0, intro: 0, flash: 0, hp: 1, maxHp: 1, state: 'x', face: 1 }, 0.5); }
+    else if (what === 'police') { g.scale(1.5, 1.5); Town.drawPolice(g, { face: 1, hopping: false, t: 0 }, 0.4); }
     else if (what === 'gold') { g.scale(0.9, 0.9); drawGold(g, { moving: true, runT: 1.2, face: 1, hitT: 0 }, 0.4); }
     else if (what === 'rabbit') { g.scale(1.5, 1.5); drawRabbit(g, fake, 0); }
     else if (what === 'squirrel') { g.scale(1.5, 1.5); drawSquirrel(g, fake, 0); }
