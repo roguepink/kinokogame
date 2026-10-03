@@ -571,6 +571,7 @@ const Render = (() => {
         continue;
       }
       if (p.rainbow) { const hue = (p.t * 720) % 360; ctx.fillStyle = `hsl(${hue},95%,65%)`; ctx.beginPath(); ctx.arc(p.x, p.y - p.h, 7, 0, TAU); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6; ctx.stroke(); continue; }
+      if (p.pellet) { ctx.fillStyle = p.gold ? '#ffe14d' : '#ffb347'; ctx.beginPath(); ctx.arc(p.x, p.y - p.h, 5, 0, TAU); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.stroke(); continue; }
       Art.blit(ctx, p.gold ? S.goldball : S.inkball, p.x, p.y - p.h, p.small ? 0.7 : p.wet ? 1.4 : p.gold ? 1.25 : 1.05);
     }
   }
