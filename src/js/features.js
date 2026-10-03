@@ -5,11 +5,14 @@
 const Features = (() => {
   const C = {
     outbreak: { first: 30, every: 48, limit: 42, r0: 70, r1: 250, count: 11, max: 22, addEvery: 5, bonus: 1200, taintSlow: 0.7, taintLife: 35 },
-    crate: { first: 12, every: 24, max: 2, time: 15 },
+    crate: { first: 12, every: 22, max: 2 },
     weapons: {
-      spread: { name: 'スプレッド', color: '#ff9d2e', rate: 6.5, n: 3, arc: 0.24 },
-      charge: { name: 'チャージ', color: '#4fc3ff', need: 0.55, speed: 920, range: 620, dmg: 3, hr: 18 },
-      bubble: { name: 'バブル', color: '#9be0ff', rate: 3.2, speed: 240, life: 1.7, splash: 85, dmg: 1 },
+      roller:    { name: 'ペイントローラー', color: '#ff5fa8', time: 18, r: 30, life: 9, tick: 0.8, speedMul: 1.35, tip: 'おしながら 歩くと 道を 塗る。帯の上は 速い! てきは すべる' },
+      sprinkler: { name: 'スプリンクラー', color: '#5fc8ff', time: 20, max: 2, life: 12, spin: 2.6, every: 0.13, speed: 320, range: 180, tip: 'おすと その場に 置く(2台まで)。まわりに まきつづける' },
+      boomerang: { name: 'ブーメラン', color: '#ffb347', time: 20, speed: 520, out: 0.55, returnMax: 2.4, tip: 'なげると もどってくる。キャッチすると 大きくなる(Lv3まで)' },
+      bomb:      { name: 'インクばくだん', color: '#c35cff', time: 18, throwDist: 190, fuse: 3, r: 150, dmg: 4, selfR: 110, selfStun: 0.8, tip: '3びょうで 大爆発。もう一度 おすと すぐ爆発。近いと インクまみれ!' },
+      mist:      { name: '霧ふき(ミスト)', color: '#c8ecff', time: 18, max: 3, dist: 120, r: 110, life: 6, tick: 2.5, tip: '霧の中の てきは おそく、かくれた キノコが 見える。霧の中を 通った弾は 2倍!' },
+      rainbow:   { name: '虹の水てっぽう', color: '#ff8ad0', time: 16, rate: 8, allyTime: 12, tip: 'かくし武器! 当てた どうぶつが なかまに なって たたかう' },
     },
     boss: { at: 62, hp: 46, cr: 48, hr: 72, speed: 42, weakEvery: 7, weakTime: 2.6, weakMul: 3, sporeEvery: 4.5, spores: 5, cloudEvery: 10, cloudR: 170, cloudTime: 3.2, score: 3000 },
     mission: { bonusTime: 12, bonusScore: 300 },
@@ -26,6 +29,7 @@ const Features = (() => {
     G.missions = { cur: null, done: 0, list: [], flash: 0 };
     G.companions = 0;
     G.weapon = null; G.weaponT = 0; G.charge = 0; G.wasFiring = false;
+    G.bands = []; G.sprinklers = []; G.boom = null; G.boomLv = 1; G.boomDrop = null; G.bombs = []; G.mists = []; G.onBand = false; G.rolling = false;
     G.night = 0; G.eve = 0;
     G.stats.outbreaks = 0; G.stats.outbreaksCleared = 0; G.stats.missions = 0; G.stats.boss = 0; G.stats.crates = 0;
     nextMission();
@@ -104,17 +108,23 @@ const Features = (() => {
   }
   function playerSpeedMul() {
     const P = G.player;
-    if (G.power > 0) return 1;
-    return inTaint(P.x, P.y) ? C.outbreak.taintSlow : 1;
+    let k = 1;
+    if (G.onBand) k *= C.weapons.roller.speedMul;
+    if ((P.inkT || 0) > 0) k *= 0.15;
+    if (G.power > 0) return k;
+    return k * (inTaint(P.x, P.y) ? C.outbreak.taintSlow : 1);
   }
 
   // ================= 武器の箱 =================
+  // ローラー(塗る)・スプリンクラー(置く)・ブーメラン(戻す)・ばくだん(待つ)・ミスト(じゅんび)・虹(かくし: 敵を仲間に)
   function spawnCrate() {
     const P = G.player;
     const s = G.world.randomSpot(Math.random, (x, y) => { const d = Math.hypot(x - P.x, y - P.y); return d > 280 && d < 700; }, 30);
     if (!s) return false;
-    const keys = Object.keys(C.weapons);
-    G.crates.push({ kind: 'crate', x: s.x, y: s.y, t: 0, w: keys[Math.floor(Math.random() * keys.length)], life: 40 });
+    let keys = ['roller', 'sprinkler', 'boomerang', 'bomb', 'mist'];
+    if (typeof Meta !== 'undefined' && Meta.rainbowUnlocked() && Math.random() < 0.18) keys = ['rainbow'];
+    const w = keys[Math.floor(Math.random() * keys.length)];
+    G.crates.push({ kind: 'crate', x: s.x, y: s.y, t: 0, w, life: 40 });
     return true;
   }
   function updateCrates(dt) {
@@ -133,86 +143,260 @@ const Features = (() => {
       G.weaponT -= dt;
       if (G.weaponT <= 0) { G.weapon = null; G.charge = 0; UI.toast('ふつうの みずでっぽうに もどった'); }
     }
+    updateBands(dt); updateSprinklers(dt); updateBoomerang(dt); updateBombs(dt); updateMists(dt);
   }
   function pickCrate(c) {
     const w = C.weapons[c.w];
-    G.weapon = c.w; G.weaponT = C.crate.time; G.charge = 0;
+    G.weapon = c.w; G.weaponT = w.time + (G.charmWeaponTime || 0); G.charge = 0;
     G.stats.crates += 1;
+    if (typeof Meta !== 'undefined') Meta.codexSee('w_' + c.w);
     floatText(c.x, c.y - 40, w.name + '!', w.color, 26);
-    const tip = c.w === 'spread' ? '3方向に ひろがる' : c.w === 'charge' ? 'おしっぱなしで ためて はなすと つらぬく' : 'ふわふわ とんで ひろく はじける';
-    UI.toast(w.name + ' ゲット! ' + tip, 3400);
+    UI.toast(w.name + ' ゲット! ' + w.tip, 3600);
     burst(c.x, c.y - 16, 20, { s0: 50, s1: 170, l0: 0.4, l1: 0.9, z0: 3, z1: 6, color: [w.color, '#fff', '#fff6a8'], shape: 'spark' });
     ring(c.x, c.y - 4, 6, 60, 0.4, w.color, 4);
     Sound.sfx.pickup();
-  }
-  // 発射を引き受ける。true を返したら通常の発射はしない
-  function weaponFire(P, aim, dt) {
-    if (!G.weapon) { G.wasFiring = P.firing; return false; }
-    const g = CONFIG.gun;
-    const w = C.weapons[G.weapon];
-    const power = G.power > 0;
-    if (G.weapon === 'spread') {
-      if (P.firing && P.fireCd <= 0) {
-        for (let i = 0; i < w.n; i++) {
-          const a = aim + (i - (w.n - 1) / 2) * w.arc + (Math.random() - 0.5) * 0.04;
-          const sp = g.speed * rr(0.95, 1.05);
-          G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: (g.range * 0.9) / g.speed, dropT: 0, h: 22, dmg: power ? CONFIG.power.damage : 1, gold: power, homing: power, t: 0 });
-        }
-        muzzle(P, aim, w.color, 14);
-        P.recoil = 1; P.fireCd = 1 / (power ? CONFIG.power.rate : w.rate);
-        Sound.sfx.shoot(power);
-      }
-    } else if (G.weapon === 'bubble') {
-      if (P.firing && P.fireCd <= 0) {
-        const a = aim + (Math.random() - 0.5) * 0.1;
-        G.proj.push({ x: P.x + Math.cos(a) * 26, y: P.y + Math.sin(a) * 26, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: w.life, dropT: 0, h: 30, dmg: w.dmg + (power ? 1 : 0), gold: power, homing: power, t: 0, bubble: true, hr: 20, ph: Math.random() * TAU });
-        muzzle(P, aim, w.color, 12);
-        P.recoil = 0.6; P.fireCd = 1 / w.rate;
-        Sound.sfx.bubble();
-      }
-    } else if (G.weapon === 'charge') {
-      if (P.firing) {
-        G.charge = Math.min(G.charge + dt, w.need + 0.4);
-        if (Math.random() < dt * 30) addParticle({ x: P.x + Math.cos(aim) * 30 + rr(-14, 14), y: P.y - 20 + Math.sin(aim) * 30 + rr(-14, 14), vx: -Math.cos(aim) * 40, vy: -Math.sin(aim) * 40, ay: 0, drag: 4, life: 0.3, max: 0.3, size: rr(2, 4), color: w.color, shape: 'spark', rot: 0, vr: 6, grow: 0 });
-        if (G.charge >= w.need && G.charge - dt < w.need) Sound.sfx.charged();
-      } else if (G.wasFiring && G.charge > 0) {
-        if (G.charge >= w.need) {
-          const a = aim;
-          G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: w.range / w.speed, dropT: 0, h: 20, dmg: w.dmg + (power ? 1 : 0), gold: power, homing: false, t: 0, pierce: true, hit: new Set(), hr: w.hr });
-          muzzle(P, a, w.color, 26);
-          P.recoil = 1.6;
-          G.cam.kx -= Math.cos(a) * 16; G.cam.ky -= Math.sin(a) * 16; G.cam.shake = Math.max(G.cam.shake, 5);
-          Sound.sfx.beam();
-        } else { Sound.sfx.click(); }
-        G.charge = 0;
-      }
-    }
-    G.wasFiring = P.firing;
-    return true;
   }
   function muzzle(P, a, color, size) {
     const mx = P.x + Math.cos(a) * 30; const my = P.y - 20 + Math.sin(a) * 30;
     addParticle({ x: mx, y: my, vx: 0, vy: 0, ay: 0, drag: 0, life: 0.07, max: 0.07, size, color, shape: 'flash', rot: a, vr: 0, grow: 0 });
     G.cam.kx -= Math.cos(a) * 4; G.cam.ky -= Math.sin(a) * 4;
   }
-  // バブルがはじけたとき: まわりにまとめてダメージ
-  function bubbleBurst(p) {
-    const w = C.weapons.bubble;
-    ring(p.x, p.y - 8, 10, w.splash, 0.35, 'rgba(160,225,255,0.9)', 5);
-    burst(p.x, p.y - 8, 16, { s0: 40, s1: 160, l0: 0.3, l1: 0.6, z0: 2, z1: 5, color: ['#9be0ff', '#ff9ad0', '#fff'], shape: 'ink', ay: 250 });
-    addDecal(p.x, p.y, 1.4, p.gold ? 'gsplat' : 'splat', 14);
-    for (const m of G.mushrooms) { if (m.dead || m.type === 'good') continue; if (Math.hypot(m.x - p.x, m.y - p.y) < w.splash + m.hr) hitMushroom(m, { x: m.x, y: m.y - 10, vx: (m.x - p.x) * 3, vy: (m.y - p.y) * 3, dmg: p.dmg, gold: p.gold }); }
-    for (const e of G.enemies) { if (e.state === 'flee') continue; if (Math.hypot(e.x - p.x, e.y - p.y) < w.splash + e.def.hr) hitEnemy(e, { x: e.x, y: e.y - 10, vx: (e.x - p.x) * 3, vy: (e.y - p.y) * 3, dmg: p.dmg, gold: p.gold }); }
-    if (G.boss && Math.hypot(G.boss.x - p.x, G.boss.y - p.y) < w.splash + C.boss.hr) hitBoss({ x: p.x, y: p.y, vx: 0, vy: 0, dmg: p.dmg, gold: p.gold });
-    Sound.sfx.pop(0);
+  // 発射を引き受ける。true を返したら通常の発射はしない
+  function weaponFire(P, aim, dt) {
+    const pressed = P.firing && !G.wasFiring;
+    const released = !P.firing && G.wasFiring;
+    G.wasFiring = P.firing;
+    if (!G.weapon) return false;
+    const w = C.weapons[G.weapon];
+    const power = G.power > 0;
+    switch (G.weapon) {
+      case 'roller': {
+        // おしている間、歩いた道にインクの帯を塗る
+        G.rolling = P.firing;
+        if (P.firing) {
+          const last = G.bands.length ? G.bands[G.bands.length - 1] : null;
+          if (!last || Math.hypot(last.x - P.x, last.y - P.y) > 18) {
+            G.bands.push({ x: P.x, y: P.y + 2, r: w.r, life: w.life, t: 0, hitT: 0 });
+            if (G.bands.length > 160) G.bands.shift();
+            if (Math.random() < 0.6) addParticle({ x: P.x + rr(-14, 14), y: P.y + rr(-4, 6), vx: rr(-20, 20), vy: -rr(20, 60), ay: 200, drag: 0, life: 0.4, max: 0.4, size: rr(2, 3.5), color: '#ff3d9a', shape: 'ink', rot: 0, vr: 0, grow: 0 });
+          }
+        }
+        return true;
+      }
+      case 'sprinkler': {
+        if (pressed) {
+          if (G.sprinklers.length >= w.max) G.sprinklers.shift();
+          G.sprinklers.push({ x: P.x + Math.cos(aim) * 36, y: P.y + Math.sin(aim) * 36, a: aim, t: 0, life: w.life, shotT: 0, power });
+          floatText(P.x, P.y - 60, 'スプリンクラー せっち!', w.color, 18);
+          Sound.sfx.pickup();
+        }
+        return true;
+      }
+      case 'boomerang': {
+        if (pressed && !G.boom) {
+          const lv = G.boomLv || 1;
+          const sp = w.speed * (1 + (lv - 1) * 0.15);
+          G.boom = { x: P.x + Math.cos(aim) * 20, y: P.y - 10 + Math.sin(aim) * 20, vx: Math.cos(aim) * sp, vy: Math.sin(aim) * sp, t: 0, out: w.out, lv, hit: new Set(), leg: 0, rot: 0, dmg: lv + (power ? 1 : 0), gold: power };
+          muzzle(P, aim, w.color, 14);
+          P.recoil = 1;
+          Sound.sfx.swipe();
+        }
+        return true;
+      }
+      case 'bomb': {
+        if (pressed) {
+          const armed = G.bombs.filter((b) => b.z === 0 && !b.done);
+          if (armed.length) { for (const b of armed) b.fuse = 0.02; } // もう一度おすと すぐ爆発
+          else {
+            const d = w.throwDist;
+            G.bombs.push({ x: P.x, y: P.y - 20, tx: P.x + Math.cos(aim) * d, ty: P.y + Math.sin(aim) * d, sx: P.x, sy: P.y - 20, u: 0, z: 1, fuse: w.fuse, t: 0, done: false, power });
+            muzzle(P, aim, w.color, 12);
+            P.recoil = 0.8;
+            Sound.sfx.bubble();
+          }
+        }
+        return true;
+      }
+      case 'mist': {
+        if (pressed) {
+          if (G.mists.length >= w.max) G.mists.shift();
+          const mx = P.x + Math.cos(aim) * w.dist; const my = P.y + Math.sin(aim) * w.dist;
+          G.mists.push({ x: mx, y: my, r: w.r, life: w.life, t: 0, tick: 0 });
+          muzzle(P, aim, w.color, 18);
+          burst(P.x + Math.cos(aim) * 30, P.y - 16 + Math.sin(aim) * 30, 24, { dir: aim, spread: 0.9, s0: 120, s1: 320, l0: 0.4, l1: 0.8, z0: 6, z1: 12, color: ['rgba(200,235,255,0.5)', 'rgba(255,255,255,0.45)'], shape: 'dust', grow: 20, drag: 3 });
+          P.recoil = 1;
+          Sound.sfx.beam();
+        }
+        return true;
+      }
+      case 'rainbow': {
+        if (P.firing && P.fireCd <= 0) {
+          const a = aim + (Math.random() - 0.5) * 0.08;
+          const sp = CONFIG.gun.speed;
+          G.proj.push({ x: P.x + Math.cos(a) * 28, y: P.y + Math.sin(a) * 28, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: CONFIG.gun.range / sp, dropT: 0, h: 22, dmg: power ? 2 : 1, gold: power, homing: true, t: 0, rainbow: true });
+          muzzle(P, a, '#ff8ad0', 16);
+          P.recoil = 1; P.fireCd = 1 / (power ? CONFIG.power.rate : w.rate);
+          Sound.sfx.shoot(true);
+        }
+        return true;
+      }
+      default: return false;
+    }
   }
+
+  // --- ローラーの帯 ---
+  function updateBands(dt) {
+    const P = G.player;
+    const w = C.weapons.roller;
+    G.onBand = false;
+    const keep = [];
+    for (const b of G.bands) {
+      b.life -= dt; b.t += dt; b.hitT -= dt;
+      if (b.life <= 0) continue;
+      if (Math.hypot(P.x - b.x, P.y - b.y) < b.r + 4) G.onBand = true;
+      if (b.hitT <= 0) {
+        b.hitT = w.tick;
+        // 帯が重なっていても、キノコ1本につき tick に1回だけ
+        for (const m of G.mushrooms) { if (m.dead || m.type === 'good' || m.type === 'gold' || (m.bandT || 0) > 0) continue; if (Math.hypot(m.x - b.x, m.y - b.y) < b.r + m.hr * 0.6) { m.bandT = w.tick; hitMushroom(m, { x: m.x, y: m.y - 6, vx: 0, vy: -60, dmg: 1, gold: false, quiet: true }); } }
+        for (const e of G.enemies) { if (e.state === 'flee' || e.state === 'ally' || e.z > 10 || (e.slipCd || 0) > 0) continue; if (Math.hypot(e.x - b.x, e.y - b.y) < b.r + e.def.cr * 0.5) { e.slipCd = 4; stunEnemy(e, 1.2); floatText(e.x, e.y - 80, 'つるん!', '#ff9ad0', 20); } }
+      }
+      keep.push(b);
+    }
+    G.bands = keep;
+    for (const e of G.enemies) if ((e.slipCd || 0) > 0) e.slipCd -= dt;
+    if (keep.length) for (const m of G.mushrooms) if ((m.bandT || 0) > 0) m.bandT -= dt;
+  }
+  // --- スプリンクラー ---
+  function updateSprinklers(dt) {
+    const w = C.weapons.sprinkler;
+    const keep = [];
+    for (const s of G.sprinklers) {
+      s.t += dt; s.life -= dt;
+      if (s.life <= 0) { burst(s.x, s.y - 10, 10, { s0: 30, s1: 90, l0: 0.3, l1: 0.6, z0: 2, z1: 4, color: ['#8fd8ff', '#fff'], shape: 'spark' }); continue; }
+      s.a += dt * w.spin;
+      s.shotT -= dt;
+      if (s.shotT <= 0) {
+        s.shotT = w.every;
+        for (const k of [0, Math.PI]) {
+          const a = s.a + k;
+          G.proj.push({ x: s.x + Math.cos(a) * 10, y: s.y + Math.sin(a) * 10, vx: Math.cos(a) * w.speed, vy: Math.sin(a) * w.speed, life: w.range / w.speed, dropT: 0, h: 16, dmg: s.power ? 2 : 1, gold: s.power, homing: false, t: 0, small: true });
+        }
+      }
+      keep.push(s);
+    }
+    G.sprinklers = keep;
+  }
+  // --- ブーメラン ---
+  function updateBoomerang(dt) {
+    const b = G.boom;
+    const w = C.weapons.boomerang;
+    const P = G.player;
+    // 落ちたブーメランを拾う
+    if (G.boomDrop) {
+      const d = G.boomDrop; d.t += dt;
+      if (Math.hypot(d.x - P.x, d.y - P.y) < P.r + 18) { G.boomDrop = null; G.boomLv = 1; floatText(P.x, P.y - 56, 'ひろった', '#fff', 16); Sound.sfx.click(); }
+    }
+    if (!b) return;
+    b.t += dt; b.rot += dt * 18;
+    if (b.leg === 0 && b.t >= b.out) { b.leg = 1; b.hit = new Set(); }
+    if (b.leg === 1) {
+      // もどってくる: プレイヤーへ向きを変える
+      const a = Math.atan2(P.y - 10 - b.y, P.x - b.x);
+      const cur = Math.atan2(b.vy, b.vx);
+      const na = cur + clamp(angleDiff(cur, a), -7 * dt, 7 * dt);
+      const sp = Math.hypot(b.vx, b.vy);
+      b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
+      if (Math.hypot(P.x - b.x, P.y - 10 - b.y) < 34) {
+        // キャッチ: レベルアップ
+        G.boomLv = Math.min(3, (G.boomLv || 1) + 1);
+        G.stats.boomMax = Math.max(G.stats.boomMax || 1, G.boomLv);
+        floatText(P.x, P.y - 60, G.boomLv >= 3 ? 'MAX! ブーメラン Lv3' : 'キャッチ! Lv' + G.boomLv, '#ffe14d', 20);
+        ring(P.x, P.y - 10, 6, 40, 0.3, 'rgba(255,230,120,0.9)', 3);
+        G.boom = null; Sound.sfx.pickup();
+        return;
+      }
+      if (b.t > b.out + w.returnMax) {
+        // 落ちた
+        G.boomDrop = { x: b.x, y: b.y, t: 0 };
+        G.boom = null; G.boomLv = 1;
+        floatText(b.x, b.y - 30, 'おとした…', '#fff', 16);
+        return;
+      }
+    }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    const r = 16 + b.lv * 6;
+    // 当たり(行きと帰りで1回ずつ)
+    for (const m of G.mushrooms) { if (m.dead || m.type === 'good' || b.hit.has(m)) continue; if (Math.hypot(m.x - b.x, m.y - b.y) < m.hr + r) { b.hit.add(m); hitMushroom(m, { x: m.x, y: m.y - 8, vx: b.vx, vy: b.vy, dmg: b.dmg, gold: b.gold }); } }
+    for (const e of G.enemies) { if (e.state === 'flee' || b.hit.has(e)) continue; if (Math.hypot(e.x - b.x, e.y - b.y) < e.def.hr + r) { b.hit.add(e); hitEnemy(e, { x: e.x, y: e.y - 10, vx: b.vx, vy: b.vy, dmg: b.dmg, gold: b.gold }); } }
+    if (G.boss && !G.boss.dead && !b.hit.has(G.boss) && Math.hypot(G.boss.x - b.x, G.boss.y - 30 - b.y) < G.boss.hr + r) { b.hit.add(G.boss); hitBoss({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, dmg: b.dmg, gold: b.gold }); }
+    if (Math.random() < dt * 30) addParticle({ x: b.x, y: b.y, vx: rr(-10, 10), vy: rr(-10, 10), ay: 120, drag: 0, life: 0.35, max: 0.35, size: rr(1.5, 3), color: b.gold ? '#ffe14d' : '#ff3d9a', shape: 'ink', rot: 0, vr: 0, grow: 0 });
+  }
+  // --- ばくだん ---
+  function updateBombs(dt) {
+    const w = C.weapons.bomb;
+    const P = G.player;
+    const keep = [];
+    for (const b of G.bombs) {
+      b.t += dt;
+      if (b.done) continue;
+      if (b.z > 0) { // 飛んでいる
+        b.u = Math.min(1, b.u + dt / 0.55);
+        b.x = lerp(b.sx, b.tx, b.u); b.y = lerp(b.sy, b.ty, b.u);
+        b.z = b.u >= 1 ? 0 : Math.sin(Math.PI * b.u) * 70;
+        if (b.z === 0) { b.y = b.ty; moveBody(b, 0, 0, 10); Sound.sfx.click(); }
+      } else {
+        b.fuse -= dt;
+        if (b.fuse <= 0) {
+          b.done = true;
+          const R = w.r;
+          ring(b.x, b.y, 10, R, 0.45, 'rgba(255,100,180,0.95)', 10);
+          ring(b.x, b.y, 4, R * 0.6, 0.3, 'rgba(255,255,255,0.9)', 5);
+          burst(b.x, b.y - 10, 50, { s0: 80, s1: 360, l0: 0.5, l1: 1.1, z0: 3, z1: 9, color: b.power ? ['#ffe14d', '#fff6a8', '#fff'] : ['#ff3d9a', '#ff9ad0', '#c4126a', '#fff'], shape: 'ink', ay: 380, drag: 1 });
+          burst(b.x, b.y - 10, 20, { s0: 60, s1: 240, l0: 0.5, l1: 1, z0: 3, z1: 7, color: ['#fff', '#ffe14d'], shape: 'spark' });
+          for (let i = 0; i < 9; i++) { const a = Math.random() * TAU; const d = Math.sqrt(Math.random()) * R * 0.9; addDecal(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d * 0.8, rr(0.9, 1.6), b.power ? 'gsplat' : 'splat', 16); }
+          for (const m of G.mushrooms) { if (m.dead || m.type === 'good') continue; if (Math.hypot(m.x - b.x, m.y - b.y) < R + m.hr) hitMushroom(m, { x: m.x, y: m.y - 8, vx: (m.x - b.x) * 3, vy: (m.y - b.y) * 3, dmg: w.dmg + (b.power ? 2 : 0), gold: b.power }); }
+          for (const e of G.enemies) { if (e.state === 'flee') continue; if (Math.hypot(e.x - b.x, e.y - b.y) < R + e.def.hr) hitEnemy(e, { x: e.x, y: e.y - 10, vx: (e.x - b.x) * 4, vy: (e.y - b.y) * 4, dmg: w.dmg + (b.power ? 2 : 0), gold: b.power }); }
+          if (G.boss && !G.boss.dead && Math.hypot(G.boss.x - b.x, G.boss.y - b.y) < R + C.boss.hr) hitBoss({ x: b.x, y: b.y, vx: 0, vy: 0, dmg: w.dmg, gold: b.power });
+          // 自分が近いとインクまみれ
+          if (G.power <= 0 && Math.hypot(P.x - b.x, P.y - b.y) < w.selfR) { P.inkT = w.selfStun; P.kx += (P.x - b.x) * 4; P.ky += (P.y - b.y) * 4; floatText(P.x, P.y - 60, 'インクまみれ!', '#ff9ad0', 22); }
+          G.cam.shake = Math.max(G.cam.shake, 14); G.hitStop = Math.max(G.hitStop, 0.1);
+          Sound.sfx.slam(); Sound.sfx.pop(4);
+          continue;
+        }
+        if (b.fuse < 0.8 && Math.random() < dt * 14) addParticle({ x: b.x, y: b.y - 24, vx: rr(-20, 20), vy: -rr(30, 60), ay: 0, drag: 2, life: 0.3, max: 0.3, size: rr(2, 4), color: '#ffe14d', shape: 'spark', rot: 0, vr: 8, grow: 0 });
+      }
+      keep.push(b);
+    }
+    G.bombs = keep;
+  }
+  // --- ミスト ---
+  function updateMists(dt) {
+    const w = C.weapons.mist;
+    const keep = [];
+    for (const z of G.mists) {
+      z.t += dt; z.life -= dt; z.tick -= dt;
+      if (z.life <= 0) continue;
+      if (z.tick <= 0) {
+        z.tick = w.tick;
+        for (const m of G.mushrooms) { if (m.dead || m.type === 'good') continue; if (Math.hypot(m.x - z.x, m.y - z.y) < z.r + m.hr) { if (m.hidden) m.hidden = false; hitMushroom(m, { x: m.x, y: m.y - 8, vx: 0, vy: -40, dmg: 1, gold: false, quiet: true }); } }
+      }
+      for (const e of G.enemies) if (Math.hypot(e.x - z.x, e.y - z.y) < z.r + e.def.cr) e.slow = Math.max(e.slow, 0.3);
+      for (const m of G.mushrooms) if (m.type === 'gold' && !m.dead && Math.hypot(m.x - z.x, m.y - z.y) < z.r + 20) m.mistT = 0.3;
+      if (Math.random() < dt * 20) addParticle({ x: z.x + rr(-z.r, z.r), y: z.y + rr(-z.r, z.r) * 0.8, vx: rr(-6, 6), vy: -rr(4, 12), ay: 0, drag: 0, life: 1.6, max: 1.6, size: rr(8, 16), color: 'rgba(220,240,255,0.35)', shape: 'dust', rot: 0, vr: 0, grow: 10 });
+      keep.push(z);
+    }
+    G.mists = keep;
+  }
+  function inMist(x, y) { for (const z of G.mists || []) if (Math.hypot(x - z.x, y - z.y) < z.r) return true; return false; }
 
   // ================= ボス「キノコおやかた」 =================
   function spawnBoss() {
     const P = G.player;
     const s = G.world.randomSpot(Math.random, (x, y) => { const d = Math.hypot(x - P.x, y - P.y); return d > 420 && d < 700; }, 80);
     if (!s) return false;
-    const b = { kind: 'boss', x: s.x, y: s.y, hp: C.boss.hp, maxHp: C.boss.hp, t: 0, weakT: C.boss.weakEvery, weak: 0, sporeT: 2.5, cloudT: 6, cloud: 0, flash: 0, face: 1, wob: 0, hr: C.boss.hr, dead: false, intro: 2.2 };
+    const hp = Math.round(C.boss.hp * (G.loop ? 1.6 : 1));
+    Meta.codexSee('boss');
+    const b = { kind: 'boss', x: s.x, y: s.y, hp, maxHp: hp, t: 0, weakT: C.boss.weakEvery, weak: 0, sporeT: 2.5, cloudT: 6, cloud: 0, flash: 0, face: 1, wob: 0, hr: C.boss.hr, dead: false, intro: 2.2 };
     G.boss = b;
     if (G.ev) { for (const m of G.ev.mush) m.ev = null; G.ev = null; }
     UI.banner('キノコおやかた!');
@@ -237,7 +421,7 @@ const Features = (() => {
     if (d > 150 && B.weak <= 0) { const a = Math.atan2(dy, dx); moveBody(B, Math.cos(a) * C.boss.speed * dt, Math.sin(a) * C.boss.speed * dt, C.boss.cr); if (Math.abs(dx) > 10) B.face = dx > 0 ? 1 : -1; }
     // 弱点をさらす
     if (B.weak > 0) { B.weak -= dt; if (B.weak <= 0) B.weakT = C.boss.weakEvery; }
-    else { B.weakT -= dt; if (B.weakT <= 0) { B.weak = C.boss.weakTime; floatText(B.x, B.y - 150, 'いまだ!', '#ffe14d', 30); Sound.sfx.charged(); } }
+    else { B.weakT -= dt; if (B.weakT <= 0) { B.weak = C.boss.weakTime * (G.charmBossWeak || 1); floatText(B.x, B.y - 150, 'いまだ!', '#ffe14d', 30); Sound.sfx.charged(); } }
     // 胞子
     B.sporeT -= dt;
     if (B.sporeT <= 0 && B.weak <= 0) {
@@ -292,6 +476,7 @@ const Features = (() => {
     B.dead = true;
     const pts = Math.round(C.boss.score * scoreMul());
     G.score += pts; G.stats.boss = 1;
+    Meta.codexKill('boss');
     floatText(B.x, B.y - 120, '+' + pts, '#ffe14d', 40);
     UI.banner('おやかた たいじ!');
     ring(B.x, B.y, 30, 420, 1.1, 'rgba(255,230,120,0.95)', 12);
@@ -353,7 +538,7 @@ const Features = (() => {
   // さわったどうぶつは、しばらくついてきて、近くの毒キノコに体当たりしてくれる
   function recruit(c) {
     if (G.companions >= C.companion.max) return false;
-    c.follow = C.companion.time; c.hitT = 0; c.target = null; c.fear = false;
+    c.follow = C.companion.time * (G.charmFriend || 1); c.hitT = 0; c.target = null; c.fear = false;
     G.companions += 1;
     floatText(c.x, c.y - 56, 'なかまに なった!', '#9dffb0', 18);
     return true;
@@ -387,6 +572,7 @@ const Features = (() => {
     }
     if (c.target && d < c.target.hr + 10 && c.hitT <= 0) {
       c.hitT = C.companion.hitEvery;
+      G.stats.companionHits = (G.stats.companionHits || 0) + 1;
       hitMushroom(c.target, { x: c.target.x, y: c.target.y - 8, vx: dx * 8, vy: dy * 8, dmg: 1, gold: false });
       c.dx = -c.dx; c.dy = -c.dy; c.hopSpeed = 120; c.hopDur = 0.25; c.hopping = true; c.hopU = 0.001;
     }
@@ -398,6 +584,28 @@ const Features = (() => {
     G.eve = clamp((G.t - N.eveStart) / (N.nightStart - N.eveStart), 0, 1) * (1 - clamp((G.t - N.nightStart) / (N.nightFull - N.nightStart), 0, 1));
     G.night = clamp((G.t - N.nightStart) / (N.nightFull - N.nightStart), 0, 1);
     if (!G.shownHints.night && G.night > 0.3) { G.shownHints.night = true; UI.toast('夜になってきた… どくキノコが 光って 見つけやすい。でも どうぶつは 見えにくい'); }
+  }
+
+  // ================= 虹の水てっぽう: 倒した敵が仲間になる =================
+  function makeAlly(e) {
+    const w = C.weapons.rainbow;
+    e.state = 'ally'; e.st = 0; e.allyT = w.allyTime; e.hp = e.maxHp; e.z = 0; e.cool = 0;
+    floatText(e.x, e.y - 90, 'なかまに なった!', '#ff8ad0', 22);
+    ring(e.x, e.y - 6, 10, 80, 0.5, 'rgba(255,138,208,0.9)', 5);
+    burst(e.x, e.y - 30, 20, { s0: 60, s1: 200, l0: 0.5, l1: 0.9, z0: 3, z1: 6, color: ['#ff8ad0', '#9be0ff', '#fff6a8', '#9dffb0'], shape: 'heart', ay: -40 });
+    Sound.sfx.eat();
+  }
+  function updateAlly(e, dt) {
+    e.allyT -= dt;
+    if (e.allyT <= 0) { e.state = 'flee'; e.st = 0; e.hp = 0; floatText(e.x, e.y - 80, 'バイバイ!', '#fff', 16); return; }
+    let tgt = null; let bd = 700;
+    for (const o of G.enemies) { if (o === e || o.state === 'flee' || o.state === 'ally') continue; const d = Math.hypot(o.x - e.x, o.y - e.y); if (d < bd) { bd = d; tgt = o; } }
+    const P = G.player;
+    const tx = tgt ? tgt.x : P.x - 60 * (P.face || 1); const ty = tgt ? tgt.y : P.y + 30;
+    const dx = tx - e.x; const dy = ty - e.y; const d = Math.hypot(dx, dy);
+    if (d > 20) steer(e, dx, dy, e.def.chase * 1.1, dt);
+    if (tgt && d < e.def.cr + tgt.def.cr + 6) { defeatEnemy(tgt, true); G.stats.allyKills = (G.stats.allyKills || 0) + 1; e.kx -= dx / d * 200; e.ky -= dy / d * 200; }
+    if (Math.random() < dt * 4) addParticle({ x: e.x + rr(-16, 16), y: e.y - rr(30, 70), vx: 0, vy: -20, ay: 0, drag: 0, life: 0.8, max: 0.8, size: 4, color: '#ff8ad0', shape: 'heart', rot: 0, vr: 0, grow: 0 });
   }
 
   // ================= まとめて更新 =================
@@ -412,5 +620,5 @@ const Features = (() => {
   }
   function onPurify(m) { if (m.big) G.stats.bigs = (G.stats.bigs || 0) + 1; }
 
-  return { C, reset, update, weaponFire, bubbleBurst, hitBoss, recruit, updateCompanion, playerSpeedMul, inTaint, onPurify, spawnBoss, startOutbreak, spawnCrate, pickCrate };
+  return { C, reset, update, weaponFire, hitBoss, makeAlly, updateAlly, inMist, recruit, updateCompanion, playerSpeedMul, inTaint, onPurify, spawnBoss, startOutbreak, spawnCrate, pickCrate };
 })();

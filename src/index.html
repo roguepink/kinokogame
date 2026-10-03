@@ -10,7 +10,7 @@
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="fx"><div id="fxEve"></div><div id="fxNight"></div><div id="fxVig"></div><div id="fxRed"></div><div id="fxPurple"></div></div>
+<div id="fx"><div id="fxMist"></div><div id="fxEve"></div><div id="fxNight"></div><div id="fxVig"></div><div id="fxRed"></div><div id="fxPurple"></div></div>
 
 <!-- ゲーム中の表示 -->
 <div id="hud" class="hidden">
@@ -54,24 +54,46 @@
       <div class="logo-small">インクで もりを おそうじ!</div>
       <h1><span class="l1">どく</span><span class="l2">キノコ</span><span class="l3">大作戦</span></h1>
     </div>
-    <p class="lead">もりに はえた <b class="poison">どくキノコ</b>を インクの みずでっぽうで うちまくれ!<br>せいげんじかんは <b>3ぷん</b>(ミッションで のびる)。 <b class="ev-t">どくの大発生</b>を しずめ、<b class="gold-t">金色のキノコ</b>で パワーアップ、さいごは <b class="boss-t">ボス</b>!</p>
+    <p class="lead">もりの <b class="poison">どくキノコ</b>を インクの みずでっぽうで うちまくれ!<br><b class="ev-t">大発生</b>を しずめ、<b class="gold-t">金色のキノコ</b>で パワーアップ、さいごは <b class="boss-t">ボス</b>!</p>
+    <div class="daily" id="dailyBox"></div>
+    <button id="btnStart" class="big-btn">あそぶ!</button>
+    <label class="loop hidden" id="loopBox"><input type="checkbox" id="loopChk"> <b>2周目の森</b> てきが つよい・金色が よく出る・スコア 1.5倍</label>
+    <div class="meta-btns">
+      <button class="sub-btn" data-meta="howto">あそびかた</button>
+      <button class="sub-btn" data-meta="codex">ずかん <i id="cntCodex"></i></button>
+      <button class="sub-btn" data-meta="ach">じっせき <i id="cntAch"></i></button>
+      <button class="sub-btn" data-meta="outfit">きせかえ</button>
+      <button class="sub-btn" data-meta="charm">おまもり <i id="cntPts"></i></button>
+    </div>
+    <div class="best">ハイスコア <b id="bestTitle">0</b> <span class="today" id="todayForest"></span></div>
+    <ol class="hiscores" id="hiscores"></ol>
+  </div>
+</div>
+
+<!-- ずかん・じっせき・きせかえ・おまもり -->
+<div id="metaPanel" class="overlay hidden">
+  <div class="card meta-card">
+    <div class="tabs">
+      <button class="tab" data-tab="howto">あそびかた</button><button class="tab" data-tab="codex">ずかん</button><button class="tab" data-tab="ach">じっせき</button><button class="tab" data-tab="outfit">きせかえ</button><button class="tab" data-tab="charm">おまもり</button>
+    </div>
+    <div id="metaBody" class="meta-body"></div>
+    <div id="howtoBody" class="meta-body hidden">
     <ul class="legend">
-      <li><canvas id="ic-poison" width="72" height="72"></canvas><b>どくキノコ</b><span>うって きれいにしよう<br>(さわると のろのろ…)</span></li>
-      <li><canvas id="ic-good" width="72" height="72"></canvas><b>ふつうのキノコ</b><span>さわって たべると<br>HPかいふく</span></li>
-      <li><canvas id="ic-rabbit" width="72" height="72"></canvas><b>うさぎ・リス</b><span>さわると<br>スピードアップ!</span></li>
-      <li class="gold"><canvas id="ic-gold" width="72" height="72"></canvas><b>金色のキノコ</b><span>走ってにげる! たおすと<br>10びょう ゴールドパワー</span></li>
-      <li class="boss-l"><canvas id="ic-boss" width="72" height="72"></canvas><b>キノコおやかた</b><span>のこり1ぷんで とうじょう<br>かさを あげたら ねらえ!</span></li>
-      <li><canvas id="ic-crate" width="72" height="72"></canvas><b>武器の箱</b><span>ひろうと しばらく<br>みずでっぽうが かわる</span></li>
-      <li><canvas id="ic-map" width="72" height="72"></canvas><b>ミニマップ</b><span>むらさきの点が どくキノコ<br>あかい点が てき</span></li>
-      <li class="enemy"><canvas id="ic-gorilla" width="72" height="72"></canvas><canvas id="ic-bear" width="72" height="72"></canvas><canvas id="ic-boar" width="72" height="72"></canvas><b>ゴリラ・クマ・イノシシ</b><span>こうげきされると ダメージ!<br>インクで おいはらおう</span></li>
+      <li><canvas id="ic-poison" width="72" height="72"></canvas><b>どくキノコ</b><span>うって きれいに。<br>さわると のろのろ</span></li>
+      <li><canvas id="ic-good" width="72" height="72"></canvas><b>ふつうのキノコ</b><span>たべると HPかいふく</span></li>
+      <li><canvas id="ic-rabbit" width="72" height="72"></canvas><b>うさぎ・リス</b><span>さわると スピードアップ。<br>なかまに なる</span></li>
+      <li class="gold"><canvas id="ic-gold" width="72" height="72"></canvas><b>金色のキノコ</b><span>にげる! たおすと<br>ゴールドパワー</span></li>
+      <li class="boss-l"><canvas id="ic-boss" width="72" height="72"></canvas><b>キノコおやかた</b><span>のこり1ぷんで とうじょう。<br>かさを あげたら ねらえ</span></li>
+      <li><canvas id="ic-crate" width="72" height="72"></canvas><b>武器の箱</b><span>ひろうと しばらく<br>武器が かわる</span></li>
+      <li><canvas id="ic-map" width="72" height="72"></canvas><b>ミニマップ</b><span>むらさき: どくキノコ<br>あか: てき</span></li>
+      <li class="enemy"><canvas id="ic-gorilla" width="72" height="72"></canvas><canvas id="ic-bear" width="72" height="72"></canvas><canvas id="ic-boar" width="72" height="72"></canvas><b>ゴリラ・クマ・イノシシ</b><span>こうげきされると ダメージ。<br>インクで おいはらおう</span></li>
     </ul>
     <div class="controls">
       <div class="pc-only"><b>PC</b> WASD/矢印: うごく ・ マウス: ねらう ・ クリック/スペース: うつ ・ P: ポーズ</div>
       <div class="touch-only"><b>スマホ</b> 左がわ ドラッグ: うごく ・ 右がわ ドラッグ: ねらって うつ</div>
     </div>
-    <button id="btnStart" class="big-btn">あそぶ!</button>
-    <div class="best">ハイスコア <b id="bestTitle">0</b> <span class="today" id="todayForest"></span></div>
-    <ol class="hiscores" id="hiscores"></ol>
+    </div>
+    <button id="btnMetaClose" class="sub-btn">とじる</button>
   </div>
 </div>
 
@@ -92,6 +114,7 @@
     <div class="rank-msg" id="resMsg"></div>
     <div class="res-score"><span>スコア</span><b id="resScore">0</b></div>
     <div class="newbest hidden" id="resNew">ハイスコア こうしん!</div>
+    <div class="res-meta" id="resMeta"></div>
     <ul class="res-stats" id="resStats"></ul>
     <button id="btnRetry" class="big-btn">もういちど!</button>
     <button id="btnToTitle" class="sub-btn">タイトルへ</button>
@@ -106,6 +129,7 @@
 <script src="js/input.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/features.js"></script>
+<script src="js/meta.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>
 </body>
