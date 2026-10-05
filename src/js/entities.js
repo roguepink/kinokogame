@@ -89,6 +89,8 @@ function makePlayer() {
     kind: 'player', x: W.start.x, y: W.start.y, vx: 0, vy: 0, kx: 0, ky: 0,
     r: CONFIG.player.r, hp: CONFIG.player.maxHp, aim: 0.4, walkT: 0, moving: false, firing: false,
     recoil: 0, hurtT: 0, invuln: 0, slowT: 0, boostT: 0, fireCd: 0, trailT: 0, face: 1,
+    dashT: 0, dashCd: 0, dashDx: 1, dashDy: 0, ghostT: 0, skidT: 0,
+    sw: Melee.makeState(),
   };
 }
 function makeMushroom(type, x, y, big) {
@@ -99,7 +101,7 @@ function makeMushroom(type, x, y, big) {
   const hp = gold ? C.goldHp : big ? C.bigHp : C.hp;
   return {
     kind: 'mushroom', type, x, y, v: Math.random() < 0.5 ? 0 : 1, big: !!big, size: gold ? 1.2 : big ? 1.6 : 1,
-    hp: type === 'good' ? 1 : hp, maxHp: type === 'good' ? 1 : hp, hr: gold ? 22 : (big ? 30 : 19),
+    hp: type === 'good' ? 1 : hp, maxHp: type === 'good' ? 1 : hp, hr: gold ? C.goldHr : (big ? C.bigHr : C.hr),
     hidden: type === 'poison' && !!patch, inPatch: !gold && !!patch, wob: 0, t: Math.random() * 10, bubT: rr(0, 1), pop: 0, dead: false, hitT: 0,
     // 金色キノコ用: 走る
     vx: 0, vy: 0, face: 1, moving: false, runT: 0, dir: Math.random() * TAU, turnT: 0, dashT: 0, life: gold ? C.goldLife : 0, pauseT: 0, bumpT: 0,
@@ -117,8 +119,11 @@ function makeEnemy(type, x, y) {
     face: Math.random() < 0.5 ? 1 : -1, homeX: x, homeY: y, tx: x, ty: y, wanderT: 0, idle: rr(0.3, 2), avoidT: 0, avoidSide: 1,
     stuckT: 0, cool: 1, slow: 0, flash: 0, kx: 0, ky: 0, dur: 1, atk: '', aim: 0, moving: false, z: 0, hitDone: false,
     senseT: rr(0, 0.3), loseT: 0, seen: false, cvx: 0, cvy: 0, sx: 0, sy: 0, ex: 0, ey: 0,
+    vz: 0, spin: 0, bounces: 0, goneT: 0, hitFlash: 0,
   };
 }
+// まだ戦う相手か(逃げている・仲間・ふっとばされた・消えている敵は対象外)
+const isHostile = (e) => e.state !== 'flee' && e.state !== 'ally' && e.state !== 'launched' && e.state !== 'gone';
 
 // ---------- 場所さがし ----------
 const farFromPlayer = (x, y, d) => Math.hypot(x - G.player.x, y - G.player.y) >= d;
@@ -227,18 +232,18 @@ function respawnEnemy(e) {
   const W = G.world;
   const s = W.randomSpot(Math.random, (x, y) => Math.hypot(x - G.player.x, y - G.player.y) >= 800);
   if (s) { e.x = s.x; e.y = s.y; e.homeX = s.x; e.homeY = s.y; }
-  e.hp = e.maxHp; e.state = 'wander'; e.st = 0; e.cool = 3; e.z = 0; e.slow = 0; e.idle = 1;
+  e.hp = e.maxHp; e.state = 'wander'; e.st = 0; e.cool = 3; e.z = 0; e.slow = 0; e.idle = 1; e.spin = 0; e.vz = 0; e.kx = 0; e.ky = 0;
 }
 
 // ゲーム開始時の状態をつくる
 function resetGame() {
   G.player = makePlayer();
   G.enemies = []; G.critters = []; G.mushrooms = []; G.proj = [];
-  G.particles = []; G.texts = [];
+  G.particles = []; G.texts = []; G.ghosts = []; G.slashes = [];
   G.decals = new Array(520).fill(null); G.decalHead = 0;
   G.t = 0; G.timeLeft = CONFIG.timeLimit;
   G.score = 0; G.combo = 0; G.comboT = 0; G.comboMult = 1;
-  G.stats = { purified: 0, eaten: 0, boosts: 0, inked: 0, poisoned: 0, bestCombo: 0, gold: 0, goldSeen: 0, rams: 0 };
+  G.stats = { purified: 0, eaten: 0, boosts: 0, inked: 0, poisoned: 0, bestCombo: 0, gold: 0, goldSeen: 0, rams: 0, slashes: 0, slashKills: 0, counters: 0, dashes: 0 };
   G.power = 0; G.gold = null; G.goldT = CONFIG.mushroom.goldFirst; G.hitStop = 0; G.cam.kx = 0; G.cam.ky = 0;
   G.shownHints = {}; G.flashRed = 0; G.alertCd = 0; G.mushT = 0; G.over = null; G.fullHintT = 0;
   G.cam.shake = 0;
@@ -305,6 +310,37 @@ function hurtPlayer(dmg, sx, sy, kb) {
 }
 
 // ---------- プレイヤー ----------
+function startDash(P, mv) {
+  const D = CONFIG.player.dash;
+  const a = (mv.x || mv.y) ? Math.atan2(mv.y, mv.x) : P.aim;
+  P.dashT = D.time; P.dashCd = D.cd; P.dashDx = Math.cos(a); P.dashDy = Math.sin(a);
+  P.invuln = Math.max(P.invuln, D.invuln); P.ghostT = 0;
+  G.stats.dashes += 1;
+  ring(P.x, P.y + 2, 8, 46, 0.28, 'rgba(255,255,255,0.85)', 3);
+  burst(P.x - P.dashDx * 10, P.y, 10, { dir: a + Math.PI, spread: 1.1, s0: 60, s1: 180, l0: 0.25, l1: 0.45, z0: 4, z1: 8, grow: 14, color: 'rgba(230,240,255,0.7)', shape: 'dust' });
+  G.cam.kx -= P.dashDx * 5; G.cam.ky -= P.dashDy * 5;
+  Sound.sfx.dash();
+}
+// 止まっている物にぶつかったとき、かべに沿ってすべり、真正面なら少し横へまわりこむ
+function slideAlong(P, hit, mv, speed, dt) {
+  let nx; let ny;
+  if (hit.rect) { nx = P.x - clamp(P.x, hit.x - hit.hw2, hit.x + hit.hw2); ny = P.y - clamp(P.y, hit.y - hit.hh2, hit.y + hit.hh2); }
+  else { nx = P.x - hit.x; ny = P.y - hit.y; }
+  const nl = Math.hypot(nx, ny);
+  if (nl < 0.001) return;
+  nx /= nl; ny /= nl;
+  const il = Math.hypot(mv.x, mv.y);
+  if (!il || hit.rect) return;
+  const ix = mv.x / il; const iy = mv.y / il;
+  const head = -(ix * nx + iy * ny);           // 1 = 真正面からぶつかっている
+  if (head < 0.6) return;
+  // 進みたい向きに近いほうの接線へ(中心線をまたいだら向きを変えない)
+  let side = (ix * ny - iy * nx) <= 0 ? 1 : -1;
+  if (P.slideSide && P.slideObj === hit && head > 0.97) side = P.slideSide;
+  P.slideSide = side; P.slideObj = hit;
+  const k = speed * 0.9 * Math.min(1, (head - 0.6) / 0.3) * dt;
+  moveBody(P, -ny * side * k, nx * side * k, P.r);
+}
 function updatePlayer(dt) {
   const P = G.player;
   const C = CONFIG.player;
@@ -313,6 +349,8 @@ function updatePlayer(dt) {
   if (P.hurtT > 0) P.hurtT -= dt;
   if (P.slowT > 0) P.slowT -= dt;
   if (P.boostT > 0) P.boostT -= dt;
+  if (P.dashCd > 0) P.dashCd -= dt;
+  if (P.skidT > 0) P.skidT -= dt;
   if (P.recoil > 0) P.recoil = Math.max(0, P.recoil - dt * 9);
   if (P.fireCd > 0) P.fireCd -= dt;
   if (G.power > 0) {
@@ -323,12 +361,38 @@ function updatePlayer(dt) {
     }
   }
 
-  let mv = playing ? Input.move() : { x: 0, y: 0 };
-  let speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1) * Features.playerSpeedMul();
-  const tx = mv.x * speed;
-  const ty = mv.y * speed;
-  P.vx = approach(P.vx, tx, C.accel * dt);
-  P.vy = approach(P.vy, ty, C.accel * dt);
+  const mv = playing ? Input.move() : { x: 0, y: 0 };
+  const hasInput = mv.x !== 0 || mv.y !== 0;
+  const speed = C.speed * (P.slowT > 0 ? C.slowMul : 1) * (P.boostT > 0 ? C.boostMul : 1) * (G.power > 0 ? CONFIG.power.speedMul : 1) * Features.playerSpeedMul();
+  // ダッシュ(刀をふっている間はできない)
+  if (playing && Input.takeDash() && P.dashCd <= 0 && !Melee.busy(P)) startDash(P, mv);
+  if (P.dashT > 0) {
+    P.dashT -= dt;
+    const u = 1 - clamp(P.dashT / C.dash.time, 0, 1);
+    const ds = C.dash.speed * (1 - 0.5 * u * u);
+    P.vx = P.dashDx * ds; P.vy = P.dashDy * ds;
+    // 残像と風
+    P.ghostT -= dt;
+    if (P.ghostT <= 0) { P.ghostT = 0.035; G.ghosts.push({ x: P.x, y: P.y, aim: P.aim, walkT: P.walkT, face: P.face, lean: P.lean || 0, life: 0.24, max: 0.24, outfit: P.outfit, sw: P.sw.out }); }
+    if (Math.random() < dt * 70) addParticle({ x: P.x - P.dashDx * 14 + rr(-10, 10), y: P.y - rr(6, 34), vx: -P.dashDx * 120 + rr(-20, 20), vy: -P.dashDy * 120, ay: 0, drag: 2, life: 0.22, max: 0.22, size: rr(10, 20), color: 'rgba(255,255,255,0.9)', shape: 'streak', rot: Math.atan2(P.dashDy, P.dashDx), vr: 0, grow: 0 });
+    if (P.dashT <= 0) { P.vx *= 0.5; P.vy *= 0.5; }
+  } else if (Melee.busy(P)) {
+    // 刀をふっている間は足を止める(踏みこみは Melee が動かす)
+    const f = Math.exp(-18 * dt); P.vx *= f; P.vy *= f;
+  } else {
+    // 速度をベクトルで目標へ寄せる: 加速はすばやく、止まるときは少し余韻
+    const tx = mv.x * speed; const ty = mv.y * speed;
+    const dvx = tx - P.vx; const dvy = ty - P.vy;
+    const dl = Math.hypot(dvx, dvy);
+    const stepv = (hasInput ? C.accel : C.decel) * dt;
+    if (dl <= stepv) { P.vx = tx; P.vy = ty; } else { P.vx += (dvx / dl) * stepv; P.vy += (dvy / dl) * stepv; }
+    // 急にふり返ると 土ぼこりを立てて すべる
+    const cur = Math.hypot(P.vx, P.vy);
+    if (hasInput && cur > 140 && (mv.x * P.vx + mv.y * P.vy) / (cur * Math.hypot(mv.x, mv.y)) < -0.3 && P.skidT <= 0) {
+      P.skidT = 0.35;
+      burst(P.x, P.y + 2, 6, { dir: Math.atan2(P.vy, P.vx), spread: 1.2, s0: 30, s1: 90, l0: 0.3, l1: 0.5, z0: 4, z1: 7, grow: 12, color: 'rgba(180,160,120,0.5)', shape: 'dust', ay: -20 });
+    }
+  }
   const sp = Math.hypot(P.vx, P.vy);
   P.moving = sp > 24;
   if (P.moving) {
@@ -348,7 +412,8 @@ function updatePlayer(dt) {
     const f = Math.exp(-9 * dt);
     P.kx *= f; P.ky *= f;
   } else { P.kx = 0; P.ky = 0; }
-  moveBody(P, dx, dy, P.r);
+  const mres = moveBody(P, dx, dy, P.r);
+  if (mres.hit) slideAlong(P, mres.hit, mv, speed, dt); else P.slideObj = null;
   if (G.world.waterBlocked(P.x, P.y, P.r)) { // 念のため: 水と重なっていたら歩ける所へ戻す
     P.trapT = (P.trapT || 0) + dt;
     if (P.trapT > 0.5) { const s = G.world.randomSpot(Math.random, (x, y) => Math.hypot(x - P.x, y - P.y) < 400); if (s) { P.x = s.x; P.y = s.y; } P.trapT = 0; }
@@ -358,13 +423,15 @@ function updatePlayer(dt) {
   const view = G.view;
   const psx = (P.x - view.left) * view.zoom;
   const psy = (P.y - 21 - view.top) * view.zoom;
-  const moveAngle = (mv.x !== 0 || mv.y !== 0) ? Math.atan2(mv.y, mv.x) : null;
+  const moveAngle = hasInput ? Math.atan2(mv.y, mv.x) : null;
   const a = playing ? Input.aim(psx, psy, moveAngle) : { angle: P.aim, fire: false, touch: false };
   P.aim = a.angle;
-  P.face = Math.cos(P.aim) >= 0 ? 1 : -1;
   P.firing = a.fire && playing;
   const aimA = P.firing ? (a.touch || !Input.isTouch() ? assistAim(P.aim, a.touch) : P.aim) : P.aim;
-  if (!Features.weaponFire(P, aimA, dt) && P.firing && P.fireCd <= 0) {
+  // 近くに敵がいれば日本刀(銃はうたない)。いなければ いつもの水でっぽう
+  const sword = Melee.update(P, aimA, dt, P.firing);
+  P.face = Math.cos(P.sw.out && P.sw.phase !== 'idle' ? P.sw.angle : P.aim) >= 0 ? 1 : -1;
+  if (!sword && !Features.weaponFire(P, aimA, dt) && P.firing && P.fireCd <= 0) {
     shoot(P, aimA);
     P.fireCd = 1 / (G.power > 0 ? CONFIG.power.rate : CONFIG.gun.rate * (G.stage === 2 ? 1.35 : 1));
   }
@@ -394,7 +461,7 @@ function assistAim(angle, strong) {
     if (diff < tol && diff * d < bestScore) { bestScore = diff * d; best = ang; }
   };
   for (const m of G.mushrooms) if (!m.dead && m.type !== 'good') test(m, m.hr);
-  for (const e of G.enemies) if (e.state !== 'flee' && e.state !== 'ally') test(e, e.def.hr);
+  for (const e of G.enemies) if (isHostile(e)) test(e, e.def.hr);
   if (best === null) return angle;
   return angle + angleDiff(angle, best) * 0.7;
 }
@@ -444,7 +511,7 @@ function updateProjectiles(dt) {
     if (!dead) {
       const extra = p.hr || 0;
       for (const e of G.enemies) {
-        if (e.state === 'flee' || e.state === 'ally') continue;
+        if (!isHostile(e)) continue;
         if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.hr + extra) {
           if (p.pierce) { if (!p.hit.has(e)) { p.hit.add(e); hitEnemy(e, p); } continue; }
           if (p.bubble) { dead = true; hitKind = 'bubble'; break; }
@@ -495,7 +562,7 @@ function homeProjectile(p, dt) {
     bestD = d; best = o;
   };
   for (const m of G.mushrooms) if (!m.dead && m.type !== 'good') test(m);
-  for (const e of G.enemies) if (e.state !== 'flee' && e.state !== 'ally') test(e);
+  for (const e of G.enemies) if (isHostile(e)) test(e);
   if (!best) { p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp; return; }
   const want = Math.atan2(best.y - (best.kind === 'enemy' ? 10 : 0) - p.y, best.x - p.x);
   const turn = p.turn || CONFIG.power.homing;
@@ -508,7 +575,7 @@ function missileSplash(p, skip) {
   burst(p.x, p.y - 8, 10, { s0: 40, s1: 150, l0: 0.3, l1: 0.6, z0: 2, z1: 4.5, color: ['#ff6a3d', '#ffb347', '#fff'], shape: 'ink', ay: 260 });
   G.cam.shake = Math.max(G.cam.shake, 4);
   for (const m of G.mushrooms) { if (m === skip || m.dead || m.type === 'good') continue; if (Math.hypot(m.x - p.x, m.y - p.y) < 70 + m.hr) hitMushroom(m, { x: m.x, y: m.y - 8, vx: (m.x - p.x) * 3, vy: (m.y - p.y) * 3, dmg: 1, gold: p.gold, quiet: true }); }
-  for (const e of G.enemies) { if (e === skip || e.state === 'flee' || e.state === 'ally') continue; if (Math.hypot(e.x - p.x, e.y - p.y) < 70 + e.def.hr) hitEnemy(e, { x: e.x, y: e.y - 10, vx: (e.x - p.x) * 3, vy: (e.y - p.y) * 3, dmg: 1, gold: p.gold }); }
+  for (const e of G.enemies) { if (e === skip || !isHostile(e)) continue; if (Math.hypot(e.x - p.x, e.y - p.y) < 70 + e.def.hr) hitEnemy(e, { x: e.x, y: e.y - 10, vx: (e.x - p.x) * 3, vy: (e.y - p.y) * 3, dmg: 1, gold: p.gold }); }
 }
 
 function hitMushroom(m, p) {
@@ -572,23 +639,48 @@ function activatePower() {
 function hitEnemy(e, p) {
   if (p.missile && !p.splashed) { p.splashed = true; missileSplash(p, e); }
   e.hp -= p.dmg || 1;
-  e.flash = 0.12;
-  e.slow = 0.5;
+  e.flash = p.melee ? 0.16 : 0.12;
+  e.hitFlash = p.melee ? 0.1 : 0.07;
+  e.slow = p.melee ? 0.7 : 0.5;
   const kb = p.kb ? 0.16 : 0.045;
   e.kx += p.vx * kb; e.ky += p.vy * kb;
-  burst(p.x, p.y - 12, 7, { dir: Math.atan2(p.vy, p.vx), spread: 2.2, s0: 50, s1: 140, l0: 0.25, l1: 0.45, z0: 1.8, z1: 3.6, color: p.gold ? ['#ffe14d', '#fff'] : ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 260 });
-  addDecal(e.x + rr(-14, 14), e.y + rr(-4, 8), 0.5, p.gold ? 'gsplat' : 'splat', 10);
-  G.cam.shake = Math.max(G.cam.shake, 1.8);
-  Sound.sfx.hitEnemy();
+  if (p.melee) {
+    // 刀: 火花と白い切り口
+    const a = Math.atan2(p.vy, p.vx);
+    burst(p.x, p.y - 16, 9, { dir: a, spread: 1.6, s0: 120, s1: 320, l0: 0.18, l1: 0.36, z0: 2, z1: 4.5, color: ['#fff', '#fff6a8', '#ffe14d'], shape: 'spark', drag: 4 });
+    burst(p.x, p.y - 16, 5, { dir: a, spread: 2.4, s0: 60, s1: 200, l0: 0.2, l1: 0.4, z0: 9, z1: 18, color: 'rgba(255,255,255,0.9)', shape: 'streak', drag: 3 });
+    floatText(e.x + rr(-10, 10), e.y - e.def.hr * 1.6 - 30, String(p.dmg), p.finisher ? '#ffe14d' : '#fff', p.finisher ? 30 : 22);
+  } else {
+    burst(p.x, p.y - 12, 7, { dir: Math.atan2(p.vy, p.vx), spread: 2.2, s0: 50, s1: 140, l0: 0.25, l1: 0.45, z0: 1.8, z1: 3.6, color: p.gold ? ['#ffe14d', '#fff'] : ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 260 });
+    addDecal(e.x + rr(-14, 14), e.y + rr(-4, 8), 0.5, p.gold ? 'gsplat' : 'splat', 10);
+    G.cam.shake = Math.max(G.cam.shake, 1.8);
+    Sound.sfx.hitEnemy();
+  }
   if (e.state === 'wander' && e.cool <= 0.5) { e.state = 'chase'; e.st = 0; e.seen = true; }
-  if (e.hp <= 0) { if (p.rainbow) Features.makeAlly(e); else defeatEnemy(e, false); }
+  if (e.hp <= 0) { if (p.rainbow) Features.makeAlly(e); else defeatEnemy(e, false, p.melee ? 'slash' : null); }
 }
 
 // 敵を撃退: インクまみれで逃げていく。ram=true は体当たり(パワーアップ中)
-function defeatEnemy(e, ram) {
+function defeatEnemy(e, ram, how) {
   e.state = 'flee'; e.st = 0; e.z = 0; e.hitDone = true; e.hp = 0;
   G.stats.inked += 1;
   Meta.codexKill(e.type);
+  if (how === 'slash') {
+    // 刀でとどめ: 回転しながら ふっとんでいく
+    const P = G.player;
+    const a = Math.atan2(e.y - P.y, e.x - P.x);
+    e.state = 'launched'; e.vz = 360; e.z = 0; e.spin = 0; e.bounces = 0;
+    e.kx = Math.cos(a) * 640; e.ky = Math.sin(a) * 640;
+    G.stats.slashKills += 1;
+    addScore(e.def.score + 30, e.x, e.y - 70, '#fff6a8');
+    floatText(e.x, e.y - 100, 'ズバッ!!', '#ffe14d', 32);
+    ring(e.x, e.y - 20, 10, 110, 0.4, 'rgba(255,255,255,0.95)', 6);
+    burst(e.x, e.y - 30, 26, { s0: 80, s1: 300, l0: 0.4, l1: 0.8, z0: 2.5, z1: 5.5, color: ['#fff', '#ffe14d', '#fff6a8', '#ff9ad0'], shape: 'spark', ay: 60, drag: 2 });
+    G.cam.shake = Math.max(G.cam.shake, 9);
+    G.hitStop = Math.max(G.hitStop, 0.1);
+    Sound.sfx.launch();
+    return;
+  }
   if (ram) {
     G.stats.rams += 1;
     const P = G.player;
@@ -670,11 +762,40 @@ function stunEnemy(e, dur) {
   if (Math.hypot(e.x - G.player.x, e.y - G.player.y) < 500) G.cam.shake = Math.max(G.cam.shake, 5);
 }
 
+// 刀でふっとばされた敵: 回転しながら飛び、2回はねて 星になって消える
+function updateLaunched(e, dt) {
+  const def = e.def;
+  e.vz -= 1100 * dt; e.z += e.vz * dt;
+  e.spin += dt * 15 * (e.face >= 0 ? 1 : -1);
+  const r = moveBody(e, e.kx * dt, e.ky * dt, def.cr);
+  if (r.hit || r.water) { e.kx *= -0.35; e.ky *= -0.35; }
+  const f = Math.exp(-1.1 * dt); e.kx *= f; e.ky *= f;
+  if (Math.random() < dt * 20) addParticle({ x: e.x + rr(-10, 10), y: e.y - e.z - rr(10, 40), vx: rr(-20, 20), vy: rr(-20, 20), ay: 0, drag: 2, life: 0.4, max: 0.4, size: rr(3, 5), color: '#fff6a8', shape: 'spark', rot: Math.random() * TAU, vr: 6, grow: 0 });
+  if (e.z <= 0 && e.vz < 0) {
+    e.z = 0; e.bounces += 1;
+    burst(e.x, e.y, 8, { s0: 30, s1: 100, l0: 0.3, l1: 0.6, z0: 5, z1: 9, grow: 12, color: 'rgba(210,190,150,0.7)', shape: 'dust' });
+    if (e.bounces >= 2 || Math.hypot(e.kx, e.ky) < 70) {
+      // ぽん、と消える
+      e.state = 'gone'; e.goneT = rr(5, 9); e.z = 0; e.kx = 0; e.ky = 0;
+      ring(e.x, e.y - 20, 6, 70, 0.4, 'rgba(255,255,255,0.9)', 4);
+      burst(e.x, e.y - 24, 10, { s0: 40, s1: 140, l0: 0.5, l1: 0.9, z0: 4, z1: 7, color: ['#ffe14d', '#fff6a8', '#fff'], shape: 'spark', ay: 40 });
+      burst(e.x, e.y - 16, 8, { s0: 20, s1: 60, l0: 0.5, l1: 0.8, z0: 8, z1: 14, grow: 16, color: 'rgba(255,255,255,0.6)', shape: 'dust' });
+      floatText(e.x, e.y - 60, 'バイバイ!', '#fff', 18);
+      Sound.sfx.poof();
+      return;
+    }
+    e.vz = 230; e.kx *= 0.6; e.ky *= 0.6;
+    if (Math.hypot(e.x - G.player.x, e.y - G.player.y) < 600) G.cam.shake = Math.max(G.cam.shake, 3);
+  }
+}
 function updateEnemy(e, dt) {
   const P = G.player;
   const def = e.def;
   const W = G.world;
   e.t += dt; e.st += dt;
+  if (e.hitFlash > 0) e.hitFlash -= dt;
+  if (e.state === 'launched') { if (e.flash > 0) e.flash -= dt; updateLaunched(e, dt); return; }
+  if (e.state === 'gone') { e.goneT -= dt; if (e.goneT <= 0) respawnEnemy(e); return; }
   if (e.flash > 0) e.flash -= dt;
   if (e.cool > 0) e.cool -= dt;
   if (e.slow > 0) e.slow -= dt;
@@ -795,7 +916,7 @@ function updateEnemy(e, dt) {
     default: break;
   }
   // パワーアップ中は体当たりでふっとばす
-  if (G.power > 0 && e.state !== 'flee' && e.state !== 'ally' && d < def.cr + P.r + 8 && e.z < 30) { defeatEnemy(e, true); return; }
+  if (G.power > 0 && isHostile(e) && d < def.cr + P.r + 8 && e.z < 30) { defeatEnemy(e, true); return; }
   // プレイヤーと体が重ならないように押し返す
   const min = def.cr + P.r;
   if (d < min && d > 0.01 && e.state !== 'flee' && e.z < 10) {
@@ -811,6 +932,7 @@ function separateEnemies() {
     for (let j = i + 1; j < list.length; j++) {
       const a = list[i];
       const b = list[j];
+      if (a.state === 'launched' || a.state === 'gone' || b.state === 'launched' || b.state === 'gone') continue;
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const d = Math.hypot(dx, dy) || 0.01;
@@ -1012,12 +1134,14 @@ function updateParticles(dt) {
   }
   G.texts = tx;
   for (const d of G.decals) if (d) d.t += dt;
+  if (G.ghosts.length) G.ghosts = G.ghosts.filter((g) => (g.life -= dt) > 0);
+  if (G.slashes.length) G.slashes = G.slashes.filter((sl) => (sl.life -= dt) > 0);
 }
 
 function updateDirector(dt) {
   const D = G.stage === 2 ? CONFIG.stage2.director : CONFIG.director;
   const target = Math.min(D.max, D.start + Math.floor(G.t / D.every));
-  const hostile = G.enemies.filter((e) => e.state !== 'ally').length;
+  const hostile = G.enemies.filter((e) => e.state !== 'ally' && e.state !== 'gone').length;
   if (hostile < target) {
     G.spawnT = (G.spawnT || 0) - dt;
     if (G.spawnT <= 0) { G.spawnT = 1.5; spawnEnemy(false); }

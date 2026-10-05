@@ -107,6 +107,17 @@ const Sound = (() => {
     shotgun() { noise(0.25, 0.22, 900, 'lowpass'); tone(90, 0.25, 'sawtooth', 0.14, 40); noise(0.08, 0.1, 4000, 'highpass'); },
     missile() { noise(0.2, 0.1, 1200, 'bandpass'); tone(200, 0.3, 'sawtooth', 0.08, 900); },
     powerEnd() { [784, 659, 523].forEach((f, i) => tone(f, 0.2, 'triangle', 0.08, null, i * 0.12)); },
+    // ---- 日本刀・ダッシュ ----
+    draw() { noise(0.12, 0.06, 6000, 'highpass'); tone(2400, 0.14, 'sine', 0.05, 3600); tone(3600, 0.22, 'sine', 0.035, 4400, 0.05); },   // しゃきん
+    swish(big) { noise(big ? 0.26 : 0.14, big ? 0.15 : 0.09, big ? 1300 : 2300, 'bandpass'); tone(big ? 420 : 680, big ? 0.24 : 0.12, 'sine', 0.05, big ? 80 : 150); },
+    slashHit(big) {
+      noise(0.06, 0.16, 5200, 'highpass'); tone(big ? 170 : 250, big ? 0.22 : 0.12, 'square', 0.1, 50); tone(2900, 0.09, 'sine', 0.06, 1200);
+      if (big) { noise(0.32, 0.2, 500, 'lowpass'); tone(70, 0.32, 'sine', 0.24, 32); }
+    },
+    counter() { [1046, 1568, 2093].forEach((f, i) => tone(f, 0.12, 'square', 0.05, null, i * 0.05)); noise(0.08, 0.1, 4000, 'highpass'); },
+    launch() { tone(300, 0.5, 'sawtooth', 0.07, 1500); noise(0.25, 0.12, 700, 'lowpass'); tone(90, 0.3, 'sine', 0.2, 40); },
+    poof() { noise(0.2, 0.1, 1800, 'bandpass'); tone(900, 0.15, 'sine', 0.06, 1800); },
+    dash() { noise(0.18, 0.1, 1600, 'bandpass'); tone(500, 0.16, 'sine', 0.05, 950); },
   };
 
   // ---- BGM: ペンタトニックの明るいループ ----

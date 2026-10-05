@@ -4,11 +4,15 @@
 const CONFIG = {
   world: { size: 4000, tile: 20, seed: 7721 },
   // 画面の拡大率: 見える面積が targetArea 付近になるよう調整し、最低でも minW x minH は見えるようにする
-  view: { targetArea: 400000, minW: 520, minH: 360, maxDpr: 2, maxPixels: 4.5e6 },
+  view: { targetArea: 360000, minW: 470, minH: 330, maxDpr: 2, maxPixels: 4.5e6 },
+  // キャラクターの表示倍率(当たり判定はそのまま)。絵を大きく見せる
+  scale: { player: 1.5, enemy: 1.38, critter: 1.36, mushroom: 1.32 },
   timeLimit: 180, // 秒
 
   player: {
-    r: 15, speed: 210, accel: 2400, maxHp: 100,
+    r: 15, speed: 222, accel: 2600, decel: 3600, maxHp: 100,
+    // ダッシュ: 一瞬だけ速く走る(そのあいだ無敵)。Shift / 右クリック / 左がわを2回タップ
+    dash: { speed: 780, time: 0.17, cd: 0.6, invuln: 0.24 },
     invuln: 0.9,          // 被弾後の無敵時間
     slowMul: 0.5, slowTime: 6,   // 毒キノコを食べたとき
     boostMul: 1.55, boostTime: 7, boostMax: 12, // うさぎ・リス
@@ -25,6 +29,7 @@ const CONFIG = {
     revealRadius: 175,    // 草むらに隠れた毒キノコが見えるようになる距離
     // 金色の毒キノコ: 走って逃げる。倒すとパワーアップ
     goldHp: 7, goldScore: 500, goldSpeed: 172, goldFlee: 300, goldLife: 26, goldFirst: 20, goldEvery: 34,
+    hr: 23, bigHr: 35, goldHr: 25, // 弾の当たる半径(絵を大きくしたぶん広め)
   },
   // 金色キノコを倒したときのパワーアップ
   power: { time: 10, speedMul: 1.6, rate: 15, homing: 9, scoreMul: 2, damage: 2, ramScore: 150 },
