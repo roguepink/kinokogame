@@ -271,7 +271,7 @@ const Features = (() => {
       if (d.cd <= 0) {
         let tgt = null; let bd = w.seek;
         for (const m of G.mushrooms) { if (m.dead || m.type === 'good') continue; const dd = Math.hypot(m.x - d.x, m.y - d.y); if (dd < bd) { bd = dd; tgt = m; } }
-        for (const e of G.enemies) { if (e.state === 'flee' || e.state === 'ally') continue; const dd = Math.hypot(e.x - d.x, e.y - d.y); if (dd < bd) { bd = dd; tgt = e; } }
+        for (const e of G.enemies) { if (!isHostile(e)) continue; const dd = Math.hypot(e.x - d.x, e.y - d.y); if (dd < bd) { bd = dd; tgt = e; } }
         if (G.boss && !G.boss.dead) { const dd = Math.hypot(G.boss.x - d.x, G.boss.y - d.y); if (dd < bd) { bd = dd; tgt = G.boss; } }
         if (tgt) {
           d.cd = 1 / w.rate;
@@ -312,7 +312,7 @@ const Features = (() => {
       b.x += b.vx * dt; b.y += b.vy * dt;
       const r = 16 + b.lv * 6;
       for (const m of G.mushrooms) { if (m.dead || m.type === 'good' || b.hit.has(m)) continue; if (Math.hypot(m.x - b.x, m.y - b.y) < m.hr + r) { b.hit.add(m); hitMushroom(m, { x: m.x, y: m.y - 8, vx: b.vx, vy: b.vy, dmg: b.dmg, gold: b.gold }); } }
-      for (const e of G.enemies) { if (e.state === 'flee' || e.state === 'ally' || b.hit.has(e)) continue; if (Math.hypot(e.x - b.x, e.y - b.y) < e.def.hr + r) { b.hit.add(e); hitEnemy(e, { x: e.x, y: e.y - 10, vx: b.vx, vy: b.vy, dmg: b.dmg, gold: b.gold }); } }
+      for (const e of G.enemies) { if (!isHostile(e) || b.hit.has(e)) continue; if (Math.hypot(e.x - b.x, e.y - b.y) < e.def.hr + r) { b.hit.add(e); hitEnemy(e, { x: e.x, y: e.y - 10, vx: b.vx, vy: b.vy, dmg: b.dmg, gold: b.gold }); } }
       if (G.boss && !G.boss.dead && !b.hit.has(G.boss) && Math.hypot(G.boss.x - b.x, G.boss.y - 30 - b.y) < G.boss.hr + r) { b.hit.add(G.boss); hitBoss({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, dmg: b.dmg, gold: b.gold }); }
       if (Math.random() < dt * 30) addParticle({ x: b.x, y: b.y, vx: rr(-10, 10), vy: rr(-10, 10), ay: 120, drag: 0, life: 0.35, max: 0.35, size: rr(1.5, 3), color: b.gold ? '#ffe14d' : '#ff3d9a', shape: 'ink', rot: 0, vr: 0, grow: 0 });
       keep.push(b);
@@ -537,10 +537,10 @@ const Features = (() => {
     let tgt = null; let bd = 900; let kind = null;
     // いま追っている相手は、たおすまで追いつづける
     const cur = e.allyTgt;
-    if (cur && ((cur.kind === 'enemy' && cur.state !== 'flee' && cur.state !== 'ally') || (cur.kind === 'boss' && !cur.dead && G.boss === cur) || (cur.kind === 'mushroom' && !cur.dead)) && Math.hypot(cur.x - e.x, cur.y - e.y) < 1100) {
+    if (cur && ((cur.kind === 'enemy' && isHostile(cur)) || (cur.kind === 'boss' && !cur.dead && G.boss === cur) || (cur.kind === 'mushroom' && !cur.dead)) && Math.hypot(cur.x - e.x, cur.y - e.y) < 1100) {
       tgt = cur; kind = cur.kind === 'enemy' ? 'enemy' : cur.kind === 'boss' ? 'boss' : 'mush';
     } else {
-      for (const o of G.enemies) { if (o === e || o.state === 'flee' || o.state === 'ally') continue; const d = Math.hypot(o.x - e.x, o.y - e.y); if (d < bd) { bd = d; tgt = o; kind = 'enemy'; } }
+      for (const o of G.enemies) { if (o === e || !isHostile(o)) continue; const d = Math.hypot(o.x - e.x, o.y - e.y); if (d < bd) { bd = d; tgt = o; kind = 'enemy'; } }
       if (G.boss && !G.boss.dead && G.boss.intro <= 0) { const d = Math.hypot(G.boss.x - e.x, G.boss.y - e.y) * 0.6; if (d < bd) { bd = d; tgt = G.boss; kind = 'boss'; } }
       if (!tgt) { bd = 500; for (const m of G.mushrooms) { if (m.dead || m.type !== 'poison') continue; const d = Math.hypot(m.x - e.x, m.y - e.y); if (d < bd) { bd = d; tgt = m; kind = 'mush'; } } }
       e.allyTgt = tgt;

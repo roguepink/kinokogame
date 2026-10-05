@@ -63,12 +63,14 @@ const Meta = (() => {
     { id: 'townboss', name: '総長を たおした', desc: 'リーゼント総長を たいじ', test: (s) => G.stage === 2 && s.boss >= 1 },
     { id: 'rainbow', name: 'にじいろの きずな', desc: '虹の水てっぽうで なかまに した どうぶつが 敵を たおす', test: (s) => (s.allyKills || 0) >= 1 },
     { id: 'night', name: 'よるの ハンター', desc: '夜に 金色のキノコを たおす', test: (s) => s.nightGold >= 1 },
-    { id: 's12k', name: 'もりの でんせつ', desc: 'スコア 12000', test: (s, score) => score >= 12000 },
+    { id: 's12k', name: 'もりの でんせつ', desc: 'スコア 15000', test: (s, score) => score >= 15000 },
     { id: 'games10', name: 'じょうれんさん', desc: '10回 あそぶ', test: () => D.games >= 10 },
     { id: 'codex', name: 'ずかん コンプリート', desc: 'ずかんを ぜんぶ うめる', test: () => codexCount() >= CODEX.length },
     { id: 'loopA', name: '2周目の ヒーロー', desc: '2周目の森で ランクA', test: (s, score, rank, loop) => loop && (rank === 'A' || rank === 'S') },
     { id: 'friend', name: 'なかまと いっしょ', desc: 'なかまの どうぶつが 10回 体当たり', test: (s) => (s.companionHits || 0) >= 10 },
     { id: 'boom3', name: 'ブーメラン名人', desc: 'ブーメランを Lv3に', test: (s) => (s.boomMax || 0) >= 3 },
+    { id: 'slash10', name: 'さむらい', desc: '1ゲームで 日本刀で 10匹 ふっとばす', test: (s) => (s.slashKills || 0) >= 10 },
+    { id: 'counter5', name: 'みきり', desc: '1ゲームで カウンターを 5回', test: (s) => (s.counters || 0) >= 5 },
   ];
   const achCount = () => ACH.filter((a) => D.ach[a.id]).length;
 
@@ -185,7 +187,7 @@ const Meta = (() => {
     const howto = document.getElementById('howtoBody');
     howto.classList.toggle('hidden', tab !== 'howto');
     body.classList.toggle('hidden', tab === 'howto');
-    if (tab === 'howto') { if (!howto.dataset.drawn) { howto.dataset.drawn = '1'; for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gold', 'gold'], ['ic-boss', 'boss'], ['ic-crate', 'crate'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar']]) { const c = document.getElementById(id); if (c) Art.drawIcon(c, what); } const m = document.getElementById('ic-map'); if (m && typeof drawMapIcon === 'function') drawMapIcon(m); } return; }
+    if (tab === 'howto') { if (!howto.dataset.drawn) { howto.dataset.drawn = '1'; for (const [id, what] of [['ic-poison', 'poison'], ['ic-good', 'good'], ['ic-rabbit', 'rabbit'], ['ic-gold', 'gold'], ['ic-boss', 'boss'], ['ic-crate', 'crate'], ['ic-gorilla', 'gorilla'], ['ic-bear', 'bear'], ['ic-boar', 'boar'], ['ic-katana', 'katana'], ['ic-dash', 'dash']]) { const c = document.getElementById(id); if (c) Art.drawIcon(c, what); } const m = document.getElementById('ic-map'); if (m && typeof drawMapIcon === 'function') drawMapIcon(m); } return; }
     let h = '';
     if (tab === 'codex') {
       h += `<p class="meta-sub">ずかん ${codexCount()} / ${CODEX.length}</p><ul class="codex">`;
@@ -220,7 +222,7 @@ const Meta = (() => {
     body.querySelectorAll('[data-buy]').forEach((b) => b.addEventListener('click', () => { if (buyCharm(b.dataset.buy)) { Sound.init(); Sound.sfx.pickup(); render('charm'); } }));
     body.querySelectorAll('[data-eq]').forEach((b) => b.addEventListener('click', () => { equipCharm(D.charms.eq === b.dataset.eq ? null : b.dataset.eq); render('charm'); }));
     const pv = document.getElementById('outfitPreview');
-    if (pv) { const g = pv.getContext('2d'); g.clearRect(0, 0, 140, 140); g.save(); g.translate(70, 126); g.scale(2.6, 2.6); Art.drawBoy(g, { aim: 0.4, walkT: 0, moving: false, recoil: 0, hurtT: 0, slowT: 0, firing: false, vx: 0, vy: 0, lean: 0, outfit: outfit() }, 0.5); g.restore(); }
+    if (pv) { const g = pv.getContext('2d'); g.clearRect(0, 0, 140, 140); g.save(); g.translate(70, 126); g.scale(2.6, 2.6); Art.drawBoy(g, { aim: 0.4, walkT: 0, moving: false, recoil: 0, hurtT: 0, slowT: 0, firing: false, vx: 0, vy: 0, lean: 0, face: 1, sw: Melee.makeState(), outfit: outfit() }, 0.5); g.restore(); }
   }
 
   return { D, CODEX, ACH, SHIRTS, HATS, CHARMS, codexSee, codexKill, codexCount, achCount, rainbowUnlocked, outfit, charm, buyCharm, equipCharm, daily, applyStart, onGameEnd, openPanel, save, setLoop: (v) => { D.loop = !!v; save(); }, loopUnlocked: () => D.loopUnlocked, loopOn: () => !!(D.loop && D.loopUnlocked), pts: () => D.pts, stage2Unlocked: () => !!D.stage2, stage: () => (D.stage === 2 && D.stage2 ? 2 : 1), setStage: (n) => { D.stage = n; save(); } };

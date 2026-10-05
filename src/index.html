@@ -10,7 +10,7 @@
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="fx"><div id="fxMist"></div><div id="fxEve"></div><div id="fxNight"></div><div id="fxVig"></div><div id="fxRed"></div><div id="fxPurple"></div></div>
+<div id="fx"><div id="fxMist"></div><div id="fxEve"></div><div id="fxNight"></div><div id="fxVig"></div><div id="fxRed"></div><div id="fxPurple"></div><div id="fxWhite"></div></div>
 
 <!-- ゲーム中の表示 -->
 <div id="hud" class="hidden">
@@ -45,7 +45,7 @@
 
 <div id="toast" class="hidden"></div>
 <div id="banner" class="hidden"></div>
-<div id="hint" class="hidden"><span class="pc-only">WASD / 矢印キーで うごく ・ マウスで ねらって クリックで うつ!</span><span class="touch-only">左がわで うごく ・ 右がわで ねらって うつ!</span></div>
+<div id="hint" class="hidden"><span class="pc-only">WASD / 矢印キーで うごく ・ クリックで うつ ・ Shift で ダッシュ ・ 近くの てきは 日本刀で 斬る!</span><span class="touch-only">左がわで うごく ・ 右がわで ねらって うつ ・ 左を 2回タップで ダッシュ!</span></div>
 
 <!-- タイトル -->
 <div id="title" class="overlay">
@@ -54,7 +54,8 @@
       <div class="logo-small">インクで もりを おそうじ!</div>
       <h1><span class="l1">どく</span><span class="l2">キノコ</span><span class="l3">大作戦</span></h1>
     </div>
-    <p class="lead">もりの <b class="poison">どくキノコ</b>を インクの みずでっぽうで うちまくれ!<br><b class="ev-t">大発生</b>を しずめ、<b class="gold-t">金色のキノコ</b>で パワーアップ、さいごは <b class="boss-t">ボス</b>!</p>
+    <canvas id="titleArt" class="title-art" width="360" height="150"></canvas>
+    <p class="lead">もりの <b class="poison">どくキノコ</b>を インクの みずでっぽうで うちまくれ! 近くの てきは <b class="sword-t">日本刀</b>で ズバッ!<br><b class="ev-t">大発生</b>を しずめ、<b class="gold-t">金色のキノコ</b>で パワーアップ、さいごは <b class="boss-t">ボス</b>!</p>
     <div class="stages">
       <button class="stage-btn" data-stage="1"><b>ステージ1</b><span>もり</span></button>
       <button class="stage-btn" data-stage="2"><b>ステージ2</b><span>まち</span><i>ステージ1で ランクB以上</i></button>
@@ -88,13 +89,15 @@
       <li><canvas id="ic-rabbit" width="72" height="72"></canvas><b>うさぎ・リス</b><span>さわると スピードアップ。<br>なかまに なる</span></li>
       <li class="gold"><canvas id="ic-gold" width="72" height="72"></canvas><b>金色のキノコ</b><span>にげる! たおすと<br>ゴールドパワー</span></li>
       <li class="boss-l"><canvas id="ic-boss" width="72" height="72"></canvas><b>キノコおやかた</b><span>のこり1ぷんで とうじょう。<br>かさを あげたら ねらえ</span></li>
+      <li class="sword-l"><canvas id="ic-katana" width="72" height="72"></canvas><b>日本刀</b><span>てきが 近いと 自動で 刀に。<br>おしっぱなしで 3段コンボ</span></li>
+      <li><canvas id="ic-dash" width="72" height="72"></canvas><b>ダッシュ</b><span>Shift / 右クリック / 左を 2回タップ。<br>その間は 無敵</span></li>
       <li><canvas id="ic-crate" width="72" height="72"></canvas><b>武器の箱</b><span>ひろうと しばらく<br>武器が かわる</span></li>
       <li><canvas id="ic-map" width="72" height="72"></canvas><b>ミニマップ</b><span>むらさき: どくキノコ<br>あか: てき</span></li>
       <li class="enemy"><canvas id="ic-gorilla" width="72" height="72"></canvas><canvas id="ic-bear" width="72" height="72"></canvas><canvas id="ic-boar" width="72" height="72"></canvas><b>ゴリラ・クマ・イノシシ</b><span>こうげきされると ダメージ。<br>インクで おいはらおう</span></li>
     </ul>
     <div class="controls">
-      <div class="pc-only"><b>PC</b> WASD/矢印: うごく ・ マウス: ねらう ・ クリック/スペース: うつ ・ P: ポーズ</div>
-      <div class="touch-only"><b>スマホ</b> 左がわ ドラッグ: うごく ・ 右がわ ドラッグ: ねらって うつ</div>
+      <div class="pc-only"><b>PC</b> WASD/矢印: うごく ・ マウス: ねらう ・ クリック/スペース: うつ(近くの てきは 斬る) ・ Shift/右クリック: ダッシュ ・ P: ポーズ</div>
+      <div class="touch-only"><b>スマホ</b> 左がわ ドラッグ: うごく ・ 右がわ ドラッグ: ねらって うつ(近くの てきは 斬る) ・ 左がわ 2回タップ: ダッシュ</div>
     </div>
     </div>
     <button id="btnMetaClose" class="sub-btn">とじる</button>
@@ -134,6 +137,7 @@
 <script src="js/input.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/features.js"></script>
+<script src="js/melee.js"></script>
 <script src="js/meta.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>

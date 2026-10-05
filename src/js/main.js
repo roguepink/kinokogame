@@ -77,6 +77,9 @@ const UI = {
     });
     if (slow) { const c = $('chipSlow'); if (c) c.textContent = P.slowT.toFixed(1) + 's'; }
     if (boost) { const c = $('chipBoost'); if (c) c.textContent = P.boostT.toFixed(1) + 's'; }
+    // 日本刀(近くに敵がいるとき)
+    const sword = !!(P.sw && P.sw.out);
+    this.set('sword', sword, (v) => { const old = e.chips.querySelector('.chip.sword'); if (old) old.remove(); if (v) { const d = document.createElement('div'); d.className = 'chip sword'; d.textContent = '日本刀!'; e.chips.prepend(d); } });
     // 武器
     const wkey = G.weapon || '';
     this.set('weaponKey', wkey, (v) => {
@@ -145,6 +148,7 @@ function startGame() {
   for (const id of ['title', 'pause', 'result']) UI.show(id, false);
   UI.show('hud', true);
   UI.banner('スタート!');
+  G.cam.lx = 0; G.cam.ly = 0; G.zoomPunch = 0;
   UI.show('hint', true);
   clearTimeout(G.hintTimer);
   G.hintTimer = setTimeout(() => UI.show('hint', false), 8000);
@@ -176,7 +180,7 @@ function showResult() {
   if (isBest) saveBest(G.score);
   const e = UI.el;
   e.resTitle.textContent = (G.stage === 2 ? 'まち: ' : 'もり: ') + (reason === 'time' ? 'タイムアップ!' : 'やられちゃった…');
-  const ranks = [[12000, 'S', 'もりの でんせつ!'], [7000, 'A', 'もりの ヒーロー!'], [3500, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
+  const ranks = [[15000, 'S', 'もりの でんせつ!'], [8500, 'A', 'もりの ヒーロー!'], [4000, 'B', 'なかなかの キノコハンター!'], [0, 'C', 'つぎは もっと うてるよ!']];
   let [, letter, msg] = ranks.find((r) => G.score >= r[0]);
   if (G.stats.boss && letter !== 'S') { letter = String.fromCharCode(letter.charCodeAt(0) - 1); if (letter === '@') letter = 'S'; msg = 'ボスを たおした! ' + msg; }
   addToTable(G.score, letter); renderTable();
@@ -194,7 +198,7 @@ function showResult() {
   e.resScore.textContent = G.score.toLocaleString('en-US');
   e.resNew.classList.toggle('hidden', !isBest || G.score === 0);
   const s = G.stats;
-  const rows = [['どくキノコを きれいに', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['ミッション', s.missions + '個'], ['大発生を しずめた', s.outbreaksCleared + '/' + s.outbreaks + '回'], [G.stage === 2 ? 'リーゼント総長' : 'キノコおやかた', s.boss ? 'たいじ!' : 'にがした'], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった どうぶつ', s.inked + '匹'], ['体当たりで ふっとばし', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
+  const rows = [['どくキノコ そうじ', s.purified + '本'], ['さいだいコンボ', s.bestCombo], ['日本刀で 斬った', (s.slashes || 0) + '回'], ['刀で ふっとばし', (s.slashKills || 0) + '匹'], ['カウンター', (s.counters || 0) + '回'], ['ダッシュ', (s.dashes || 0) + '回'], ['ミッション', s.missions + '個'], ['大発生を しずめた', s.outbreaksCleared + '/' + s.outbreaks + '回'], [G.stage === 2 ? 'リーゼント総長' : 'キノコおやかた', s.boss ? 'たいじ!' : 'にがした'], ['金色キノコ', s.gold + '/' + s.goldSeen + '匹'], ['おいはらった', s.inked + '匹'], ['体当たり', s.rams + '匹'], ['たべた キノコ', s.eaten + '個'], ['スピードアップ', s.boosts + '回'], ['どくを たべちゃった', s.poisoned + '回']];
   e.resStats.innerHTML = rows.map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
   e.bestTitle.textContent = Math.max(prevBest, G.score).toLocaleString('en-US');
   UI.show('result', true);
@@ -265,10 +269,14 @@ function updateCamera(dt) {
   if (G.state === 'title') {
     tx = G.world.start.x + 120 + Math.sin(G.clock * 0.25) * 30; ty = G.world.start.y + Math.cos(G.clock * 0.2) * 14;
   } else {
-    tx = P.x + Math.cos(P.aim) * 28; ty = P.y - 14 + Math.sin(P.aim) * 18;
+    // ねらいの先 + 走っている方向を少し先読み(なめらかに追いかける)
+    C.lx = lerp(C.lx || 0, P.vx * 0.16, 1 - Math.exp(-4 * dt)); C.ly = lerp(C.ly || 0, P.vy * 0.16, 1 - Math.exp(-4 * dt));
+    tx = P.x + Math.cos(P.aim) * 30 + C.lx; ty = P.y - 14 + Math.sin(P.aim) * 20 + C.ly;
   }
   const k = 1 - Math.exp(-7 * dt);
   C.x += (tx - C.x) * k; C.y += (ty - C.y) * k;
+  if (G.zoomPunch) { G.zoomPunch *= Math.exp(-9 * dt); if (G.zoomPunch < 0.002) G.zoomPunch = 0; }
+  if (G.flashWhite) { G.flashWhite -= dt * 1.4; if (G.flashWhite < 0) G.flashWhite = 0; }
   C.x = clamp(C.x, V.vw / 2, S - V.vw / 2);
   C.y = clamp(C.y, V.vh / 2, S - V.vh / 2);
   C.shake = Math.max(0, C.shake - dt * 36);
@@ -311,6 +319,37 @@ function loop(ts) {
   }
   Render.draw(G.clock);
   if (G.state !== 'title') { Render.drawMini(); UI.updateHud(); }
+  else if (!UI.el.title.classList.contains('hidden')) drawTitleArt(G.clock);
+}
+
+// タイトル画面のイラスト: 刀を構えた主人公・どくキノコ・うさぎ(ゆれる)
+let titleArt = null;
+function drawTitleArt(t) {
+  if (!titleArt) titleArt = $('titleArt');
+  if (!titleArt || !Art.S.mush) return;
+  const g = titleArt.getContext('2d');
+  const W = titleArt.width; const H = titleArt.height;
+  g.clearRect(0, 0, W, H);
+  // 地面
+  g.fillStyle = 'rgba(120,190,90,0.35)'; g.beginPath(); g.ellipse(W / 2, H - 14, W * 0.46, 14, 0, 0, TAU); g.fill();
+  const P = { aim: 0.3, walkT: 0, moving: false, recoil: 0, hurtT: 0, slowT: 0, firing: false, vx: 0, vy: 0, lean: 0, face: 1, outfit: Meta.outfit(), sw: titleArt.sw || (titleArt.sw = Object.assign(Melee.makeState(), { out: true, outT: 1 })) };
+  // ときどき 斬る
+  const cyc = t % 4.2;
+  const sw = P.sw;
+  if (cyc < 0.08) { sw.phase = 'wind'; sw.idx = 0; sw.t = cyc; sw.angle = 0.1; sw.cur = -1.5; }
+  else if (cyc < 0.2) { sw.phase = 'active'; sw.t = cyc - 0.08; sw.cur = -1.5 + 2.7 * (1 - Math.pow(1 - (cyc - 0.08) / 0.12, 2.4)); }
+  else if (cyc < 0.45) { sw.phase = 'recover'; sw.t = cyc - 0.2; sw.cur = 1.2; }
+  else { sw.phase = 'idle'; sw.t = 0; }
+  g.save(); g.translate(W * 0.28, H - 18); g.scale(2.1, 2.1); Art.blit(g, Art.S.mush.poison[0], 0, 0, 1); g.restore();
+  g.save(); g.translate(W * 0.75, H - 16); g.scale(1.9, 1.9); Art.drawRabbit(g, { face: -1, hopU: 0, fear: false, t }, t); g.restore();
+  g.save(); g.translate(W * 0.5, H - 16 + Math.sin(t * 2.2) * 1.5); g.scale(2.3, 2.3); Art.drawBoy(g, P, t); g.restore();
+  if (sw.phase === 'active' || (sw.phase === 'recover' && sw.t < 0.12)) {
+    const a0 = sw.angle - 1.5; const a1 = sw.angle + sw.cur; const k = sw.phase === 'active' ? 1 : 1 - sw.t / 0.12;
+    g.save(); g.translate(W * 0.5, H - 60); g.globalAlpha = 0.8 * k;
+    g.beginPath(); g.arc(0, 0, 74, a0, a1); g.arc(0, 0, 50, a1, a0, true); g.closePath(); g.fillStyle = 'rgba(255,255,255,0.55)'; g.fill();
+    g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.beginPath(); g.arc(0, 0, 72, a0, a1); g.stroke();
+    g.restore();
+  }
 }
 
 // 凡例用のミニマップのイラスト
@@ -398,7 +437,7 @@ function boot() {
 
 
   // 動作確認用: URL に ?debug を付けるとコンソールから状態を触れる
-  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, Features, Meta, purify, hitMushroom, refreshTitle, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
+  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, Features, Meta, Melee, purify, hitMushroom, refreshTitle, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
 
   requestAnimationFrame(loop);
 }

@@ -11,6 +11,10 @@ const Input = (() => {
   let doms = {};
   let touchUsed = false;
   let lastAim = 0.4;
+  let dashReq = false;           // ダッシュの入力(1回ぶん)。take で取り出す
+  let lastTapT = 0;
+  let lastTapX = 0;
+  let lastTapY = 0;
 
   const MOVE_KEYS = { KeyW: 'u', ArrowUp: 'u', KeyS: 'd', ArrowDown: 'd', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
 
@@ -38,6 +42,7 @@ const Input = (() => {
       if (e.repeat) { if (MOVE_KEYS[e.code] || e.code === 'Space') e.preventDefault(); return; }
       if (MOVE_KEYS[e.code] || e.code === 'Space') e.preventDefault();
       keys.add(e.code);
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyL') dashReq = true;
       if (hooks.onKey) hooks.onKey(e.code);
     });
     window.addEventListener('keyup', (e) => keys.delete(e.code));
@@ -50,6 +55,7 @@ const Input = (() => {
     for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault());
     canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse') {
+        if (e.button === 2) { dashReq = true; mouse.seen = true; mouse.x = e.clientX; mouse.y = e.clientY; return; } // 右クリック: ダッシュ
         if (e.button !== 0) return;
         mouse.down = true; mouse.seen = true; mouse.x = e.clientX; mouse.y = e.clientY;
         if (hooks.onFirstInput) hooks.onFirstInput();
@@ -58,6 +64,12 @@ const Input = (() => {
       touchUsed = true;
       const side = e.clientX < window.innerWidth * 0.5 ? 'L' : 'R';
       const s = stick[side];
+      if (side === 'L') {
+        // 左がわを すばやく2回タップ → ダッシュ
+        const now = performance.now();
+        if (now - lastTapT < 320 && Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < 90) { dashReq = true; lastTapT = 0; }
+        else { lastTapT = now; lastTapX = e.clientX; lastTapY = e.clientY; }
+      }
       if (s.id !== null) return;
       s.id = e.pointerId; s.ox = s.x = e.clientX; s.oy = s.y = e.clientY;
       try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* 無視 */ }
@@ -126,5 +138,8 @@ const Input = (() => {
     return { angle: lastAim, fire: fireKey, touch: false };
   }
 
-  return { attach, move, aim, releaseAll, isTouch: () => touchUsed, setLastAim: (a) => { lastAim = a; } };
+  // ダッシュの入力を1回ぶん取り出す(取り出すと消える)
+  function takeDash() { const d = dashReq; dashReq = false; return d; }
+
+  return { attach, move, aim, releaseAll, takeDash, isTouch: () => touchUsed, setLastAim: (a) => { lastAim = a; } };
 })();

@@ -197,15 +197,20 @@ const Town = (() => {
     for (const sx of [-1, 1]) {
       const ph = sx * wk; const lift = e.moving ? Math.max(0, -ph) * 4 : 0;
       const hx = sx * 5; const hy = -16 + bob; const kx = hx + ph * 3; const ky = -8 - lift * 0.5; const fx = hx + ph * 5; const fy = -1 - lift;
-      g.strokeStyle = OUT; g.lineWidth = 8.5; g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fx, fy); g.stroke();
-      g.strokeStyle = col; g.lineWidth = 5; g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fx, fy); g.stroke();
-      ell(g, fx + 1.4, fy + 0.5, 5.4, 3.2, shoe, 1.8);
+      Art.tube(g, [hx, hy, kx, ky, fx, fy], 5, col);
+      const sg = g.createLinearGradient(0, fy - 3, 0, fy + 3); sg.addColorStop(0, Art.lite(shoe, 0.35)); sg.addColorStop(1, Art.dark(shoe, 0.3));
+      ell(g, fx + 1.4, fy + 0.5, 5.4, 3.2, sg, 1.8);
     }
   }
   function arms(g, sx, sy, ex, ey, hx, hy, col) {
-    g.strokeStyle = OUT; g.lineWidth = 7.5; g.beginPath(); g.moveTo(sx, sy); g.lineTo(ex, ey); g.lineTo(hx, hy); g.stroke();
-    g.strokeStyle = col; g.lineWidth = 4.2; g.beginPath(); g.moveTo(sx, sy); g.lineTo(ex, ey); g.lineTo(hx, hy); g.stroke();
+    Art.tube(g, [sx, sy, ex, ey, hx, hy], 4.2, col);
     circ(g, hx, hy, 3.2, SKIN, 1.6);
+  }
+  // 頭: 球の陰影つき
+  function head(g, key, x, y, r, col, lw) { Art.orb(g, key, x, y, r, r, col, lw || 2.2, 0.32, 0.32); }
+  // 服: 上から下、左から右へ暗くなるグラデーション
+  function cloth(g, key, x0, y0, x1, y1, col) {
+    const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, Art.lite(col, 0.28)); gr.addColorStop(0.5, col); gr.addColorStop(1, Art.dark(col, 0.38)); return gr;
   }
   function softShadow(g, rx, ry, a, ox, oy) { const S = Art.S; if (S.shadowBlob) { g.save(); g.globalAlpha = a / 0.5; g.drawImage(S.shadowBlob.c, ox - rx, oy - ry, rx * 2, ry * 2); g.restore(); } }
   function alertMark(g, y, t) { const s = 1 + Math.sin(t * 24) * 0.12; g.save(); g.translate(0, y); g.scale(s, s); g.beginPath(); g.moveTo(-5, -9); g.lineTo(5, -9); g.lineTo(2.4, 3); g.lineTo(-2.4, 3); g.closePath(); fill(g, '#ff3b3b', 2); circ(g, 0, 8, 2.6, '#ff3b3b', 1.8); g.restore(); }
@@ -226,13 +231,13 @@ const Town = (() => {
     // ふくろ(背中)
     g.save(); g.translate(-14, -30 + bob); g.rotate(-0.4); ell(g, 0, 0, 10, 13, '#e8dcc0', 2); g.strokeStyle = OUT; g.lineWidth = 1.5; g.beginPath(); g.moveTo(-5, -11); g.lineTo(5, -11); g.stroke(); g.fillStyle = OUT; g.font = '800 10px sans-serif'; g.textAlign = 'center'; g.fillText('¥', 0, 4); g.restore();
     // 胴(しましま)
-    g.beginPath(); g.moveTo(-9, -17 + bob); g.quadraticCurveTo(-11, -30 + bob, -7, -34 + bob); g.lineTo(7, -34 + bob); g.quadraticCurveTo(11, -30 + bob, 9, -17 + bob); g.closePath(); fill(g, '#fff', 2.2);
-    g.save(); g.clip(); g.fillStyle = '#2c2c34'; for (let y = -33; y < -16; y += 6) g.fillRect(-12, y + bob, 24, 3); g.restore();
+    g.beginPath(); g.moveTo(-9, -17 + bob); g.quadraticCurveTo(-11, -30 + bob, -7, -34 + bob); g.lineTo(7, -34 + bob); g.quadraticCurveTo(11, -30 + bob, 9, -17 + bob); g.closePath(); fill(g, cloth(g, 'thief', -9, -34 + bob, 9, -17 + bob, '#f4f4f8'), 2.2);
+    g.save(); g.clip(); g.fillStyle = '#2c2c34'; for (let y = -33; y < -16; y += 6) g.fillRect(-12, y + bob, 24, 3); g.fillStyle = 'rgba(40,20,60,0.22)'; g.fillRect(4, -35 + bob, 8, 20); g.restore();
     arms(g, 9, -31 + bob, 15 + wind * 4, -24 + bob, 20 + wind * 6, -18 + bob + wk * 2, '#fff');
     arms(g, -9, -31 + bob, -13, -22 + bob, -10, -14 + bob - wk * 2, '#fff');
     // 頭: 黒いマスクと目だけ
     g.save(); g.translate(1, -43 + bob);
-    circ(g, 0, 0, 12, SKIN, 2.2);
+    head(g, 'thiefhead', 0, 0, 12, SKIN);
     g.fillStyle = '#2c2c34'; g.beginPath(); g.ellipse(0, -2, 12.5, 6.5, 0, 0, TAU); g.fill();
     for (const sx of [-1, 1]) { ell(g, sx * 4.5, -2, 3.2, 2.4, '#fff', 0); circ(g, sx * 4.5 + 0.8, -2, 1.4, OUT, 0); }
     g.fillStyle = '#2c2c34'; g.beginPath(); g.ellipse(0, -11, 11, 4, 0, 0, TAU); g.fill(); // ぼうし
@@ -252,14 +257,14 @@ const Town = (() => {
     softShadow(g, 20, 8, 0.44, 0, 2);
     g.save(); g.scale(dir, 1); g.rotate(0.08 + (moving ? wk * 0.05 : 0));
     legs(g, e, wk, bob, '#4a5a6a', '#2c2c34', 1);
-    g.beginPath(); g.moveTo(-11, -16 + bob); g.lineTo(-9, -36 + bob); g.lineTo(9, -36 + bob); g.lineTo(11, -16 + bob); g.lineTo(6, -14 + bob); g.lineTo(2, -18 + bob); g.lineTo(-3, -13 + bob); g.lineTo(-7, -17 + bob); g.closePath(); fill(g, '#6c7a89', 2.2);
+    g.beginPath(); g.moveTo(-11, -16 + bob); g.lineTo(-9, -36 + bob); g.lineTo(9, -36 + bob); g.lineTo(11, -16 + bob); g.lineTo(6, -14 + bob); g.lineTo(2, -18 + bob); g.lineTo(-3, -13 + bob); g.lineTo(-7, -17 + bob); g.closePath(); fill(g, cloth(g, 'zomb', -11, -36 + bob, 11, -14 + bob, '#6c7a89'), 2.2);
     g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(-9, -24 + bob, 7, 5); g.fillRect(2, -32 + bob, 6, 4);
     // 腕を前に(のばす)
     const reach = 14 + wind * 10 + swing * 6;
     arms(g, 9, -33 + bob, 16, -34 + bob + Math.sin(e.t * 3) * 2, 9 + reach, -32 + bob, '#8fbf8a');
     arms(g, -9, -33 + bob, -2, -36 + bob, 6 + reach, -38 + bob + Math.sin(e.t * 3 + 1) * 2, '#8fbf8a');
     g.save(); g.translate(2, -46 + bob); g.rotate(0.15);
-    circ(g, 0, 0, 12.5, '#8fbf8a', 2.2);
+    head(g, 'zombhead', 0, 0, 12.5, '#8fbf8a');
     g.fillStyle = '#3c4a38'; g.beginPath(); g.moveTo(-12, -3); g.quadraticCurveTo(-8, -15, 2, -13); g.quadraticCurveTo(12, -12, 12, -2); g.lineTo(8, -7); g.lineTo(4, -4); g.lineTo(-1, -9); g.lineTo(-5, -4); g.lineTo(-9, -8); g.closePath(); g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
     ell(g, -4.5, 0, 3.4, 3.8, '#fff', 1.6); circ(g, -4, 0.5, 1.3, OUT, 0); ell(g, 5, 1, 2.6, 3, '#fff', 1.6); circ(g, 5.4, 1.5, 1.2, OUT, 0);
     g.strokeStyle = OUT; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-5, 7); g.lineTo(-2, 5.5); g.lineTo(1, 7.5); g.lineTo(4, 5.5); g.lineTo(6, 7); g.stroke();
@@ -287,7 +292,7 @@ const Town = (() => {
     g.save(); g.scale(dir, 1); g.rotate(moving ? 0.1 : -0.04);
     legs(g, e, wk, bob, '#3b2f6b', '#fff', 1);
     // 長ラン(むらさき)
-    g.beginPath(); g.moveTo(-12, -10 + bob); g.lineTo(-10, -36 + bob); g.lineTo(10, -36 + bob); g.lineTo(12, -10 + bob); g.closePath(); fill(g, '#5b3f9e', 2.2);
+    g.beginPath(); g.moveTo(-12, -10 + bob); g.lineTo(-10, -36 + bob); g.lineTo(10, -36 + bob); g.lineTo(12, -10 + bob); g.closePath(); fill(g, cloth(g, 'yank', -12, -36 + bob, 12, -10 + bob, '#5b3f9e'), 2.2);
     g.fillStyle = '#ffd24d'; for (let i = 0; i < 3; i++) g.fillRect(-1.5, -30 + bob + i * 7, 3, 3);
     g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(4, -34 + bob, 7, 22);
     // 腕(ポケット or 殴る)
@@ -296,7 +301,7 @@ const Town = (() => {
     arms(g, -10, -33 + bob, -14, -24 + bob, -8, -16 + bob, '#5b3f9e');
     // 頭 + リーゼント
     g.save(); g.translate(1, -45 + bob);
-    circ(g, 0, 0, 12, SKIN, 2.2);
+    head(g, 'yankhead', 0, 0, 12, SKIN);
     g.strokeStyle = OUT; g.lineWidth = 2.2; for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * 7.5, -5.5); g.lineTo(sx * 2, -3); g.stroke(); }
     for (const sx of [-1, 1]) { ell(g, sx * 4.5, -1, 2.8, 2.2, '#fff', 1.4); circ(g, sx * 4.5 + 0.8, -0.8, 1.2, OUT, 0); }
     g.strokeStyle = OUT; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-3, 6); g.lineTo(4, 5); g.stroke();
@@ -320,12 +325,12 @@ const Town = (() => {
     const wk = Math.sin(t * 5); const bob = -Math.abs(wk) * 2;
     // 足・長ラン(体は小さめ)
     for (const sx of [-1, 1]) { g.strokeStyle = OUT; g.lineWidth = 14; g.lineCap = 'round'; g.beginPath(); g.moveTo(sx * 10, -20); g.lineTo(sx * 12 + wk * sx * 3, 0); g.stroke(); g.strokeStyle = '#3b2f6b'; g.lineWidth = 9; g.beginPath(); g.moveTo(sx * 10, -20); g.lineTo(sx * 12 + wk * sx * 3, 0); g.stroke(); ell(g, sx * 12 + wk * sx * 3, 1, 9, 5, '#fff', 2); }
-    g.beginPath(); g.moveTo(-22, -14 + bob); g.lineTo(-18, -58 + bob); g.lineTo(18, -58 + bob); g.lineTo(22, -14 + bob); g.closePath(); fill(g, '#5b3f9e', 2.6);
+    g.beginPath(); g.moveTo(-22, -14 + bob); g.lineTo(-18, -58 + bob); g.lineTo(18, -58 + bob); g.lineTo(22, -14 + bob); g.closePath(); fill(g, cloth(g, 'bossyank', -22, -58 + bob, 22, -14 + bob, '#5b3f9e'), 2.6);
     g.fillStyle = '#ffd24d'; for (let i = 0; i < 4; i++) g.fillRect(-2.5, -50 + bob + i * 9, 5, 5);
     for (const sx of [-1, 1]) { const ax = sx * 20; arms(g, ax, -52 + bob, ax + sx * 14, -36 + bob + (weak ? -30 : 0), ax + sx * (weak ? 6 : 22), -24 + bob + (weak ? -56 : 0), '#5b3f9e'); }
     // 大きな頭
     g.save(); g.translate(0, -78 + bob);
-    circ(g, 0, 0, 34, SKIN, 2.8);
+    head(g, 'bosshead', 0, 0, 34, SKIN, 2.8);
     g.strokeStyle = OUT; g.lineWidth = 3.4; g.lineCap = 'round'; for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * 22, -14); g.lineTo(sx * 6, -8); g.stroke(); }
     for (const sx of [-1, 1]) { ell(g, sx * 13, -2, 7.5, 6, '#fff', 2); circ(g, sx * 13 + 2, -1.5, 3.2, OUT, 0); circ(g, sx * 13 + 1, -3, 1.2, '#fff', 0); }
     g.strokeStyle = OUT; g.lineWidth = 2.6; g.beginPath(); if (weak) { g.moveTo(-10, 14); g.quadraticCurveTo(0, 22, 10, 14); } else { g.moveTo(-10, 17); g.lineTo(10, 15); } g.stroke();
@@ -353,12 +358,12 @@ const Town = (() => {
     softShadow(g, 12, 5, 0.4, 0, 1);
     g.save(); g.scale(dir * 0.8, 0.8);
     legs(g, { moving }, wk, bob, '#2e4a8a', '#2c2c34', 1);
-    g.beginPath(); g.moveTo(-9, -17 + bob); g.quadraticCurveTo(-11, -30 + bob, -7, -34 + bob); g.lineTo(7, -34 + bob); g.quadraticCurveTo(11, -30 + bob, 9, -17 + bob); g.closePath(); fill(g, '#2e4a8a', 2.2);
+    g.beginPath(); g.moveTo(-9, -17 + bob); g.quadraticCurveTo(-11, -30 + bob, -7, -34 + bob); g.lineTo(7, -34 + bob); g.quadraticCurveTo(11, -30 + bob, 9, -17 + bob); g.closePath(); fill(g, cloth(g, 'police', -9, -34 + bob, 9, -17 + bob, '#2e4a8a'), 2.2);
     g.fillStyle = '#ffd24d'; g.fillRect(-6, -30 + bob, 3, 3); g.fillStyle = '#fff'; g.fillRect(-3, -34 + bob, 6, 4);
     arms(g, 9, -31 + bob, 13, -24 + bob, 10, -16 + bob + wk * 3, '#2e4a8a');
     arms(g, -9, -31 + bob, -13, -24 + bob, -10, -16 + bob - wk * 3, '#2e4a8a');
     g.save(); g.translate(1, -43 + bob);
-    circ(g, 0, 0, 12, SKIN, 2.2);
+    head(g, 'policehead', 0, 0, 12, SKIN);
     for (const sx of [-1, 1]) { ell(g, sx * 4.5, 0, 3, 3.4, '#fff', 1.4); circ(g, sx * 4.5 + 0.6, 0.6, 1.5, OUT, 0); circ(g, sx * 4.5 + 1.2, -0.4, 0.6, '#fff', 0); }
     g.strokeStyle = OUT; g.lineWidth = 1.5; g.beginPath(); g.arc(0, 4.5, 2.6, 0.2, Math.PI - 0.2); g.stroke();
     g.fillStyle = '#2e4a8a'; g.beginPath(); g.moveTo(-13, -4); g.quadraticCurveTo(-12, -16, 0, -16); g.quadraticCurveTo(12, -16, 13, -4); g.closePath(); g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();

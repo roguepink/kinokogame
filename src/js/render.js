@@ -226,7 +226,8 @@ const Render = (() => {
       ctx.restore();
       ctx.save(); ctx.translate(m.x, m.y);
       const sq = m.hitT > 0 ? 1 + m.hitT * 2 : 1;
-      ctx.scale(m.face * sq * CH, (2 - sq) * CH);
+      const gs = CONFIG.scale.mushroom;
+      ctx.scale(m.face * sq * gs, (2 - sq) * gs);
       Art.drawGold(ctx, m, t);
       ctx.restore();
       // 残り時間
@@ -242,10 +243,10 @@ const Render = (() => {
     const back = 1 + 2.2 * Math.pow(e - 1, 3) + 1.2 * Math.pow(e - 1, 2); // ぴょこっと飛び出す
     const wob = m.wob > 0 ? Math.sin(t * 38) * 0.16 * (m.wob / 0.3) : 0;
     const idle = Math.sin(t * 3 + m.t * 1.2) * 0.03 + (m.hitT > 0 ? -m.hitT * 1.6 : 0);
-    const sc = m.size * clamp(back, 0.01, 1.3) * 1.1;
+    const sc = m.size * clamp(back, 0.01, 1.3) * CONFIG.scale.mushroom;
     const glowA = Math.min(1, 0.55 + Math.sin(t * 4 + m.t) * 0.2 + (G.night || 0) * 0.45);
     ctx.save(); ctx.globalAlpha = glowA;
-    Art.blit(ctx, poison ? S.glowPoison : S.glowGood, m.x, m.y - 18 * m.size, 0.62 * m.size);
+    Art.blit(ctx, poison ? S.glowPoison : S.glowGood, m.x, m.y - 22 * m.size, 0.74 * m.size);
     ctx.restore();
     ctx.save(); ctx.translate(m.x, m.y);
     ctx.rotate(wob);
@@ -260,9 +261,9 @@ const Render = (() => {
     ctx.restore();
     if (m.inPatch) drawGrassFront(ctx, m.x, m.y, 1);
     if (m.big && m.hp < m.maxHp) {
-      const w = 40;
-      ctx.fillStyle = 'rgba(40,20,50,0.7)'; ctx.fillRect(m.x - w / 2 - 1.5, m.y - 82, w + 3, 8);
-      ctx.fillStyle = '#ff3d9a'; ctx.fillRect(m.x - w / 2, m.y - 80.5, (w * m.hp) / m.maxHp, 5);
+      const w = 44;
+      ctx.fillStyle = 'rgba(40,20,50,0.7)'; ctx.fillRect(m.x - w / 2 - 1.5, m.y - 108, w + 3, 8);
+      ctx.fillStyle = '#ff3d9a'; ctx.fillRect(m.x - w / 2, m.y - 106.5, (w * m.hp) / m.maxHp, 5);
     }
   }
   function drawGrassFront(ctx, x, y, s) {
@@ -274,7 +275,32 @@ const Render = (() => {
     ctx.fill(); ctx.stroke();
   }
 
-  const CH = 1.18; // キャラクターの表示倍率(当たり判定は config 側で調整済み)
+  // ヒットした瞬間の白いシルエット: 別のキャンバスに描いて白で塗り、重ねる
+  let flashCv = null;
+  let flashG = null;
+  function drawFlashed(ctx, x, y, alpha, drawFn, color) {
+    const ps = Math.max(1, spriteScale);
+    const Wd = 320; const Hd = 340; const oy = Hd * 0.8;
+    if (!flashCv) { flashCv = document.createElement('canvas'); }
+    if (flashCv.width !== Wd * ps) { flashCv.width = Wd * ps; flashCv.height = Hd * ps; flashG = flashCv.getContext('2d'); }
+    const g = flashG;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, flashCv.width, flashCv.height);
+    g.setTransform(ps, 0, 0, ps, (Wd / 2) * ps, oy * ps);
+    G.noShadow = true;
+    drawFn(g);
+    G.noShadow = false;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = color || '#fff'; g.fillRect(0, 0, flashCv.width, flashCv.height); g.globalCompositeOperation = 'source-over';
+    ctx.save(); ctx.globalAlpha = alpha; ctx.drawImage(flashCv, x - Wd / 2, y - oy, Wd, Hd); ctx.restore();
+  }
+  function drawEnemyBody(ctx, o, t) {
+    const dir = o.face >= 0 ? 1 : -1;
+    const sq = o.flash > 0 ? 1 + o.flash * 0.9 : 1;
+    const ES = CONFIG.scale.enemy;
+    if (o.type === 'boar') { ctx.scale(dir * sq * ES, (2 - sq) * ES); Art.drawBoar(ctx, o, t); }
+    else if (o.type === 'thief' || o.type === 'zombie' || o.type === 'yankee') { ctx.scale(sq * ES, (2 - sq) * ES); (o.type === 'thief' ? Town.drawThief : o.type === 'zombie' ? Town.drawZombie : Town.drawYankee)(ctx, o, t); }
+    else { ctx.scale(sq * ES, (2 - sq) * ES); if (o.type === 'bear') Art.drawBear(ctx, o, t); else Art.drawGorilla(ctx, o, t); }
+  }
   function drawEntityItem(ctx, o, t) {
     const P = G.player;
     switch (o.kind) {
@@ -282,25 +308,33 @@ const Render = (() => {
       case 'crate': ctx.save(); ctx.translate(o.x, o.y); Art.drawCrate(ctx, o, t); ctx.restore(); break;
       case 'boss': {
         ctx.save(); ctx.translate(o.x, o.y);
-        if (o.dead) ctx.globalAlpha = Math.max(0, 1 - (t % 100) * 0); // 消えるまでそのまま
         if (G.stage === 2) Town.drawBossYankee(ctx, o, t); else { ctx.scale(o.face || 1, 1); Art.drawBoss(ctx, o, t); }
         ctx.restore();
         break;
       }
       case 'critter':
-        ctx.save(); ctx.translate(o.x, o.y); ctx.scale(CH, CH);
+        ctx.save(); ctx.translate(o.x, o.y); ctx.scale(CONFIG.scale.critter, CONFIG.scale.critter);
         if (o.type === 'rabbit') Art.drawRabbit(ctx, o, t); else if (o.type === 'police') Town.drawPolice(ctx, o, t); else Art.drawSquirrel(ctx, o, t);
         ctx.restore();
         if (o.follow > 0) { ctx.save(); ctx.translate(o.x, o.y - 44 + Math.sin(t * 5) * 2); heartPath(ctx, 0, 0, 6); ctx.fillStyle = '#ff6fa0'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = OUT; ctx.stroke(); ctx.restore(); }
         break;
       case 'enemy': {
+        if (o.state === 'gone') break;
+        if (o.state === 'launched') {
+          // ふっとび中: 影は地面に、体は回転しながら宙を飛ぶ
+          const z = o.z || 0;
+          Art.shadow(ctx, 30 - z * 0.05, 11 - z * 0.02, 0.3, o.x, o.y + 2);
+          ctx.save(); ctx.translate(o.x, o.y - z);
+          const cy = -o.def.hr * 1.1;
+          ctx.translate(0, cy); ctx.rotate(o.spin); ctx.translate(0, -cy);
+          G.noShadow = true; drawEnemyBody(ctx, o, t); G.noShadow = false;
+          ctx.restore();
+          break;
+        }
         ctx.save(); ctx.translate(o.x, o.y);
-        const dir = o.face >= 0 ? 1 : -1;
-        const sq = o.flash > 0 ? 1 + o.flash * 0.9 : 1;
-        if (o.type === 'boar') { ctx.scale(dir * sq * CH, (2 - sq) * CH); Art.drawBoar(ctx, o, t); }
-        else if (o.type === 'thief' || o.type === 'zombie' || o.type === 'yankee') { ctx.scale(sq * CH, (2 - sq) * CH); (o.type === 'thief' ? Town.drawThief : o.type === 'zombie' ? Town.drawZombie : Town.drawYankee)(ctx, o, t); }
-        else { ctx.scale(sq * CH, (2 - sq) * CH); if (o.type === 'bear') Art.drawBear(ctx, o, t); else Art.drawGorilla(ctx, o, t); }
+        drawEnemyBody(ctx, o, t);
         ctx.restore();
+        if (o.hitFlash > 0) drawFlashed(ctx, o.x, o.y, Math.min(1, o.hitFlash * 12), (g) => drawEnemyBody(g, o, t));
         if (o.state === 'ally') { ctx.save(); ctx.translate(o.x, o.y - 100 + Math.sin(t * 5) * 3); heartPath(ctx, 0, 0, 8); ctx.fillStyle = '#ff8ad0'; ctx.fill(); ctx.lineWidth = 1.8; ctx.strokeStyle = OUT; ctx.stroke(); ctx.restore(); }
         break;
       }
@@ -314,10 +348,15 @@ const Render = (() => {
           ctx.strokeStyle = 'rgba(255,230,120,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([14, 9]);
           ctx.beginPath(); ctx.ellipse(0, 0, 30, 14, 0, 0, TAU); ctx.stroke(); ctx.restore();
         }
+        // ダッシュの残像
+        const PS = CONFIG.scale.player;
+        for (const gh of G.ghosts || []) {
+          drawFlashed(ctx, gh.x, gh.y, 0.5 * (gh.life / gh.max), (g) => { g.scale(PS, PS); Art.drawBoy(g, gh, t, true); }, '#bfefff');
+        }
         ctx.save(); ctx.translate(o.x, o.y);
-        if (o.invuln > 0 && G.power <= 0 && Math.floor(t * 18) % 2 === 0) ctx.globalAlpha = 0.45;
+        if (o.invuln > 0 && o.dashT <= 0 && G.power <= 0 && Math.floor(t * 18) % 2 === 0) ctx.globalAlpha = 0.45;
         const sq = o.hurtT > 0 ? 1 + o.hurtT * 0.25 : 1;
-        ctx.scale(sq * CH, (2 - sq) * CH);
+        ctx.scale(sq * PS, (2 - sq) * PS);
         Art.drawBoy(ctx, o, t);
         ctx.restore();
         if (G.weapon === 'boomerang' && (G.boomLv || 1) > 1) { ctx.font = `800 13px ${FONT}`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.strokeText('Lv' + G.boomLv, o.x, o.y - 70); ctx.fillStyle = '#ffe14d'; ctx.fillText('Lv' + G.boomLv, o.x, o.y - 70); }
@@ -485,6 +524,18 @@ const Render = (() => {
           ctx.strokeStyle = p.color; ctx.lineWidth = 2; ctx.lineCap = 'round';
           ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - Math.cos(p.rot) * p.size * 1.6, p.y - Math.sin(p.rot) * p.size * 1.6); ctx.stroke();
           break;
+        case 'leafbit':
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.color; ctx.beginPath(); ctx.ellipse(0, 0, p.size * 1.6, p.size * 0.55, 0, 0, TAU); ctx.fill(); ctx.restore();
+          break;
+        case 'cut': {
+          // 切り口: 一瞬でのびて、細くなりながら消える白い線
+          const u = 1 - a; const len = p.size * Math.min(1, u * 6 + 0.3);
+          const dx = Math.cos(p.rot) * len; const dy = Math.sin(p.rot) * len;
+          ctx.globalAlpha = Math.min(1, a * 1.6);
+          ctx.strokeStyle = OUT; ctx.lineWidth = 6 * a + 1; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x - dx, p.y - dy); ctx.lineTo(p.x + dx, p.y + dy); ctx.stroke();
+          ctx.strokeStyle = p.color; ctx.lineWidth = 3.4 * a + 0.4; ctx.beginPath(); ctx.moveTo(p.x - dx, p.y - dy); ctx.lineTo(p.x + dx, p.y + dy); ctx.stroke();
+          break;
+        }
         default: ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + 0.6 * a), 0, TAU); ctx.fill();
       }
     }
@@ -508,6 +559,36 @@ const Render = (() => {
     ctx.globalAlpha = 1;
   }
 
+  // 日本刀の斬撃: 白い三日月(ふった範囲)。ふり終わると ふっと消える
+  function drawSlashes(ctx) {
+    for (const sl of G.slashes || []) {
+      const a0 = sl.angle + sl.from;
+      const a1 = sl.angle + sl.cur;
+      if (Math.abs(a1 - a0) < 0.05) continue;
+      const k = clamp(sl.life / 0.22, 0, 1);              // 消えていく
+      const fade = sl.done ? k : 1;
+      const r = sl.r * (sl.done ? 1 + (1 - k) * 0.1 : 1);
+      const inner = r * (sl.finisher ? 0.64 : 0.6);
+      const ccw = a1 < a0;
+      const col = sl.gold ? '255,225,90' : sl.finisher ? '255,214,240' : '235,245,255';
+      ctx.save(); ctx.translate(sl.x, sl.y);
+      // 三日月: 刀の先(外側)ほど濃く、根もと(内側)は透明。ふり始めの側は細く
+      ctx.beginPath(); ctx.arc(0, 0, r, a0, a1, ccw); ctx.arc(0, 0, inner, a1, a0, !ccw); ctx.closePath();
+      const gr = ctx.createRadialGradient(0, 0, inner, 0, 0, r);
+      gr.addColorStop(0, `rgba(${col},0)`); gr.addColorStop(0.55, `rgba(${col},${0.32 * fade})`); gr.addColorStop(0.9, `rgba(${col},${0.8 * fade})`); gr.addColorStop(1, `rgba(${col},${0.1 * fade})`);
+      ctx.fillStyle = gr; ctx.fill();
+      // 刃先のするどい線(先端ほど明るい)
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = `rgba(255,255,255,${0.95 * fade})`; ctx.lineWidth = sl.finisher ? 3.2 : 2.2;
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.96, ccw ? a1 : a0 + (a1 - a0) * 0.3, ccw ? a0 + (a1 - a0) * 0.3 : a1, false); ctx.stroke();
+      ctx.strokeStyle = `rgba(${col},${0.35 * fade})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.82, a0, a1, ccw); ctx.stroke();
+      // 風のすじ
+      ctx.strokeStyle = `rgba(255,255,255,${0.5 * fade})`; ctx.lineWidth = 1;
+      for (const f of [0.7, 0.88]) { ctx.beginPath(); ctx.arc(0, 0, r * f, a0 + (a1 - a0) * 0.15, a1 - (a1 - a0) * 0.05, ccw); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
   function drawTexts(ctx) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     for (const t of G.texts) {
@@ -621,7 +702,11 @@ const Render = (() => {
     ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
     ctx.fillStyle = '#76b24a';
     ctx.fillRect(0, 0, V.W, V.H);
-    ctx.setTransform(k, 0, 0, k, -left * k, -top * k);
+    {
+      const zp = G.zoomPunch || 0;
+      const k2 = k * (1 + zp);
+      ctx.setTransform(k2, 0, 0, k2, (V.W * V.dpr) / 2 - (left + V.vw / 2) * k2, (V.H * V.dpr) / 2 - (top + V.vh / 2) * k2);
+    }
 
     // 地面: 草の濃淡 → 土の見えている所 → 小道 → 木もれ日
     if (groundPattern) { ctx.fillStyle = groundPattern; ctx.fillRect(left - 2, top - 2, V.vw + 4, V.vh + 4); }
@@ -699,7 +784,7 @@ const Render = (() => {
     });
     for (const m of G.mushrooms) if (!m.dead && !m.hidden && m.x > left - 80 && m.x < right + 80 && m.y > top - 60 && m.y < bottom + 90) drawList.push(m);
     for (const c of G.critters) if (!c.gone && c.x > left - 60 && c.x < right + 60 && c.y > top - 60 && c.y < bottom + 60) drawList.push(c);
-    for (const e of G.enemies) if (e.x > left - 120 && e.x < right + 120 && e.y > top - 120 && e.y < bottom + 160) drawList.push(e);
+    for (const e of G.enemies) if (e.state !== 'gone' && e.x > left - 120 && e.x < right + 120 && e.y > top - 160 && e.y < bottom + 160) drawList.push(e);
     for (const c of G.crates || []) if (c.x > left - 60 && c.x < right + 60 && c.y > top - 60 && c.y < bottom + 60) drawList.push(c);
     if (G.boss) drawList.push(G.boss);
     drawList.push(P);
@@ -719,6 +804,7 @@ const Render = (() => {
       ctx.beginPath(); ctx.ellipse(m.x, m.y, 22, 14, 0, 0, TAU); ctx.fill();
     }
     mark('objects');
+    drawSlashes(ctx);
     drawProjectiles(ctx);
     drawParticles(ctx, left, top, right, bottom);
     drawAmbient(ctx, t);
@@ -730,14 +816,15 @@ const Render = (() => {
     let red = G.flashRed > 0 ? clamp(G.flashRed / 0.4, 0, 1) * 0.9 : 0;
     if (G.state === 'playing' && P.hp > 0 && P.hp < 30) red = Math.max(red, 0.35 + 0.25 * Math.sin(t * 6));
     const purple = P.slowT > 0 ? Math.min(1, P.slowT) * (0.3 + 0.12 * Math.sin(t * 5)) : 0;
-    setFx(red, purple, G.night || 0, G.eve || 0, G.state === 'title' ? 0.3 : clamp(1 - G.t / 14, 0, 1) * 0.38);
+    setFx(red, purple, G.night || 0, G.eve || 0, G.state === 'title' ? 0.3 : clamp(1 - G.t / 14, 0, 1) * 0.38, G.flashWhite || 0);
     if (G.state === 'playing') drawIndicators(ctx, V, t);
     mark('overlay');
   }
 
-  let fxNight = null; let fxEve = null; let fxMist = null;
-  function setFx(red, purple, night, eve, mist) {
-    if (!fxRed) { fxRed = document.getElementById('fxRed'); fxPurple = document.getElementById('fxPurple'); fxNight = document.getElementById('fxNight'); fxEve = document.getElementById('fxEve'); fxMist = document.getElementById('fxMist'); }
+  let fxNight = null; let fxEve = null; let fxMist = null; let fxWhite = null;
+  function setFx(red, purple, night, eve, mist, white) {
+    if (!fxRed) { fxRed = document.getElementById('fxRed'); fxPurple = document.getElementById('fxPurple'); fxNight = document.getElementById('fxNight'); fxEve = document.getElementById('fxEve'); fxMist = document.getElementById('fxMist'); fxWhite = document.getElementById('fxWhite'); }
+    if (fxWhite && Math.abs((white || 0) - (fxLast.w || 0)) > 0.01) { fxLast.w = white || 0; fxWhite.style.opacity = (white || 0).toFixed(2); }
     if (fxMist && Math.abs(mist - (fxLast.m || 0)) > 0.01) { fxLast.m = mist; fxMist.style.opacity = mist.toFixed(2); }
     if (!fxRed) return;
     if (Math.abs(red - fxLast.r) > 0.02) { fxLast.r = red; fxRed.style.opacity = red.toFixed(2); }
@@ -829,7 +916,7 @@ const Render = (() => {
       else if (m.type === 'poison') dot(m.x, m.y, m.big ? 4 : 3, '#b03cff');
       else dot(m.x, m.y, 2.4, '#ffffff');
     }
-    for (const e of G.enemies) if (Math.hypot(e.x - P.x, e.y - P.y) < 800) dot(e.x, e.y, 3.8, '#ff3b3b');
+    for (const e of G.enemies) if (e.state !== 'gone' && Math.hypot(e.x - P.x, e.y - P.y) < 800) dot(e.x, e.y, 3.8, e.state === 'ally' ? '#ff8ad0' : '#ff3b3b');
     if (G.ev) { g.fillStyle = 'rgba(176,76,255,0.45)'; g.beginPath(); g.arc(G.ev.x * k, G.ev.y * k, G.ev.r * k, 0, TAU); g.fill(); }
     for (const c of G.crates || []) dot(c.x, c.y, 3.4, '#ffb347');
     if (G.boss && !G.boss.dead) dot(G.boss.x, G.boss.y, 6, '#8a3fd0');
