@@ -11,7 +11,7 @@ const Town = (() => {
     zombie: { name: 'ゾンビ',   cr: 18, hr: 32, hp: 26, wander: 30, chase: 72,  sight: 380, windup: 0.7,  damage: 18, reach: 70, score: 70, atk: 'swipe' },
     yankee: { name: 'ヤンキー', cr: 18, hr: 32, hp: 16, wander: 55, chase: 125, charge: 470, sight: 480, windup: 0.75, damage: 15, score: 80, atk: 'charge' },
   };
-  const BOSS = { name: 'リーゼント総長', hp: 60, cr: 52, hr: 80 };
+  const BOSS = { name: 'リーゼント総長', hp: 180, cr: 52, hr: 80 };
 
   // ---------- マップ ----------
   function populate(W, H) {

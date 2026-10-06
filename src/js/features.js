@@ -16,7 +16,9 @@ const Features = (() => {
       shotgun:   { name: 'ショットガン', color: '#ffb347', time: 18, rate: 4.5, n: 8, arc: 0.7, speed: 820, range: 360, dmg: 1, tip: '連射で ひろく ばらまく。ふっとばす' },
       drone:     { name: 'こうげきドローン', color: '#9fd3ec', time: 25, n: 3, life: 25, rate: 4, seek: 380, speed: 700, tip: '3台の ドローンが まわりを とんで、てきや どくキノコを 自動で うつ' },
     },
-    boss: { at: 62, hp: 46, cr: 48, hr: 72, speed: 42, weakEvery: 7, weakTime: 2.6, weakMul: 3, sporeEvery: 4.5, spores: 5, cloudEvery: 10, cloudR: 170, cloudTime: 3.2, score: 3000 },
+    // ボス: HPが多く、体当たり・ジャンプでふみつけ(森)/とっしん(まち)で攻めてくる。HPが半分を切ると おこって速くなる
+    boss: { at: 62, hp: 150, cr: 48, hr: 72, speed: 58, weakEvery: 8, weakTime: 2.2, weakMul: 2, sporeEvery: 4, spores: 7, sporeDmg: 9, cloudEvery: 9, cloudR: 170, cloudTime: 3.2, score: 3000,
+      touch: 10, touchEvery: 1.7, atkEvery: 3.2, stompWind: 0.85, stompAir: 0.6, stompR: 170, stompDmg: 22, chargeWind: 0.8, chargeTime: 0.75, chargeSpeed: 640, chargeDmg: 24, rage: 0.5, rageMul: 1.45, meleeMul: 0.6, minions: 2 },
     mission: { bonusTime: 12, bonusScore: 300 },
     companion: { time: 14, max: 2, seek: 280, hitEvery: 1.1 },
     allyMax: 4,
@@ -327,7 +329,8 @@ const Features = (() => {
     if (!s) return false;
     const hp = Math.round(C.boss.hp * (G.loop ? 1.6 : 1));
     Meta.codexSee('boss');
-    const b = { kind: 'boss', x: s.x, y: s.y, hp, maxHp: hp, t: 0, weakT: C.boss.weakEvery, weak: 0, sporeT: 2.5, cloudT: 6, cloud: 0, flash: 0, face: 1, wob: 0, hr: C.boss.hr, dead: false, intro: 2.2 };
+    const b = { kind: 'boss', x: s.x, y: s.y, hp, maxHp: hp, t: 0, weakT: C.boss.weakEvery, weak: 0, sporeT: 2.5, cloudT: 6, cloud: 0, flash: 0, face: 1, wob: 0, hr: C.boss.hr, dead: false, intro: 2.2,
+      atkT: 2.5, atk: null, aphase: '', ast: 0, z: 0, sx: 0, sy: 0, tx: 0, ty: 0, cvx: 0, cvy: 0, aim: 0, hitDone: false, rage: false, touchCd: 0 };
     G.boss = b;
     if (G.ev) { for (const m of G.ev.mush) m.ev = null; G.ev = null; }
     if (G.stage === 2) { b.hp = Math.round(Town.BOSS.hp * (G.loop ? 1.6 : 1)); b.maxHp = b.hp; b.hr = Town.BOSS.hr; }
@@ -349,15 +352,41 @@ const Features = (() => {
     if (B.wob > 0) B.wob -= dt;
     if (B.intro > 0) { B.intro -= dt; return; }
     const dx = P.x - B.x; const dy = P.y - B.y; const d = Math.hypot(dx, dy);
-    // ゆっくり追ってくる
-    if (d > 150 && B.weak <= 0) { const a = Math.atan2(dy, dx); moveBody(B, Math.cos(a) * C.boss.speed * dt, Math.sin(a) * C.boss.speed * dt, C.boss.cr); if (Math.abs(dx) > 10) B.face = dx > 0 ? 1 : -1; }
+    const CB = C.boss;
+    const rm = B.rage ? CB.rageMul : 1;
+    if (B.touchCd > 0) B.touchCd -= dt;
+    // HPが半分を切ると おこる: 速く・攻撃の間かくが短く・子分をよぶ
+    if (!B.rage && B.hp < B.maxHp * CB.rage) {
+      B.rage = true;
+      UI.banner(G.stage === 2 ? '総長が キレた!' : 'おやかたが おこった!');
+      G.cam.shake = Math.max(G.cam.shake, 14); G.flashRed = 0.3;
+      ring(B.x, B.y, 20, 260, 0.7, 'rgba(255,80,80,0.9)', 10);
+      Sound.sfx.bossRoar();
+      for (let i = 0; i < CB.minions; i++) { const e = spawnEnemy(false); if (e) { e.x = B.x + rr(-120, 120); e.y = B.y + rr(-80, 80); if (!G.world.isOpen(e.x, e.y, e.def.cr)) { e.x = B.x; e.y = B.y + 90; } e.state = 'chase'; e.seen = true; e.cool = 1; } }
+    }
+    // 攻撃中は 攻撃だけ進める
+    if (B.atk) { updateBossAttack(B, P, dt, dx, dy, d); return; }
+    // 追ってくる(弱点をさらしている間は止まる)
+    if (d > 110 && B.weak <= 0) { const a = Math.atan2(dy, dx); moveBody(B, Math.cos(a) * CB.speed * rm * dt, Math.sin(a) * CB.speed * rm * dt, CB.cr); if (Math.abs(dx) > 10) B.face = dx > 0 ? 1 : -1; }
+    // 体当たり(さわると いたい)
+    if (G.state === 'playing' && d < CB.cr + P.r + 4 && B.touchCd <= 0 && B.weak <= 0) { if (hurtPlayer(CB.touch, B.x, B.y, 420)) B.touchCd = CB.touchEvery; }
     // 弱点をさらす
-    if (B.weak > 0) { B.weak -= dt; if (B.weak <= 0) B.weakT = C.boss.weakEvery; }
-    else { B.weakT -= dt; if (B.weakT <= 0) { B.weak = C.boss.weakTime * (G.charmBossWeak || 1); floatText(B.x, B.y - 150, 'いまだ!', '#ffe14d', 30); Sound.sfx.charged(); } }
+    if (B.weak > 0) { B.weak -= dt; if (B.weak <= 0) B.weakT = CB.weakEvery; }
+    else { B.weakT -= dt; if (B.weakT <= 0) { B.weak = CB.weakTime * (G.charmBossWeak || 1); floatText(B.x, B.y - 150, 'いまだ!', '#ffe14d', 30); Sound.sfx.charged(); } }
+    // 大技: ジャンプふみつけ / とっしん
+    if (B.weak <= 0) {
+      B.atkT -= dt * rm;
+      if (B.atkT <= 0 && d < 560 && G.state === 'playing') {
+        B.atkT = CB.atkEvery;
+        const kind = G.stage === 2 ? (Math.random() < 0.6 ? 'charge' : 'stomp') : (Math.random() < 0.7 ? 'stomp' : 'charge');
+        startBossAttack(B, P, kind);
+        return;
+      }
+    }
     // 胞子
-    B.sporeT -= dt;
+    B.sporeT -= dt * rm;
     if (B.sporeT <= 0 && B.weak <= 0) {
-      B.sporeT = C.boss.sporeEvery;
+      B.sporeT = CB.sporeEvery;
       for (let i = 0; i < C.boss.spores; i++) {
         const a = Math.atan2(dy, dx) + (i - (C.boss.spores - 1) / 2) * 0.45 + rr(-0.1, 0.1);
         const sp = rr(150, 230);
@@ -372,9 +401,67 @@ const Features = (() => {
       if (G.state === 'playing' && d < C.boss.cloudR + P.r && G.power <= 0 && P.slowT <= 0.5) { P.slowT = 1.2; }
       if (Math.random() < dt * 24) addParticle({ x: B.x + rr(-C.boss.cloudR, C.boss.cloudR), y: B.y + rr(-C.boss.cloudR, C.boss.cloudR) * 0.8, vx: rr(-10, 10), vy: -rr(5, 15), ay: 0, drag: 0, life: 1.2, max: 1.2, size: rr(4, 8), color: '#a24be0', shape: 'bubble', rot: 0, vr: 0, grow: 0 });
     } else { B.cloudT -= dt; if (B.cloudT <= 0 && B.weak <= 0) { B.cloudT = C.boss.cloudEvery; B.cloud = C.boss.cloudTime; ring(B.x, B.y, 20, C.boss.cloudR, 0.6, 'rgba(170,70,230,0.8)', 8); Sound.sfx.poison(); } }
-    // 体当たりで押し返す(ダメージはない: 毒の雲と子キノコで攻める)
+    pushPlayer(B, P, dx, dy, d);
+  }
+  function pushPlayer(B, P, dx, dy, d) {
     const min = C.boss.cr + P.r;
-    if (d < min && d > 0.1) { const k = (min - d); moveBody(P, (dx / d) * k, (dy / d) * k, P.r); if (G.power > 0) hitBoss({ x: P.x, y: P.y, vx: dx * 4, vy: dy * 4, dmg: 1, gold: true }); }
+    if (d < min && d > 0.1 && (B.z || 0) < 20) { const k = (min - d); moveBody(P, (dx / d) * k, (dy / d) * k, P.r); if (G.power > 0) hitBoss({ x: P.x, y: P.y, vx: dx * 4, vy: dy * 4, dmg: 1, gold: true }); }
+  }
+  // ---- ボスの大技 ----
+  function startBossAttack(B, P, kind) {
+    const CB = C.boss;
+    B.atk = kind; B.aphase = 'wind'; B.ast = 0; B.hitDone = false;
+    B.aim = Math.atan2(P.y - B.y, P.x - B.x);
+    B.tx = P.x; B.ty = P.y; B.sx = B.x; B.sy = B.y;
+    if (Math.abs(P.x - B.x) > 10) B.face = P.x > B.x ? 1 : -1;
+    B.wob = 0.3;
+    floatText(B.x, B.y - 160, '!!', '#ff4d4d', 34);
+    Sound.sfx.roar();
+    B.windDur = (kind === 'stomp' ? CB.stompWind : CB.chargeWind) / (B.rage ? 1.25 : 1);
+  }
+  function updateBossAttack(B, P, dt, dx, dy, d) {
+    const CB = C.boss;
+    B.ast += dt;
+    if (B.aphase === 'wind') {
+      // ねらいは ためている間だけ追う(最後の少しは固定 → よけられる)
+      if (B.ast < B.windDur - 0.25) { B.aim = Math.atan2(P.y - B.y, P.x - B.x); B.tx = P.x; B.ty = P.y; }
+      if (B.ast >= B.windDur) {
+        B.aphase = 'go'; B.ast = 0; B.sx = B.x; B.sy = B.y;
+        if (B.atk === 'charge') { B.cvx = Math.cos(B.aim) * CB.chargeSpeed * (B.rage ? 1.15 : 1); B.cvy = Math.sin(B.aim) * CB.chargeSpeed * (B.rage ? 1.15 : 1); Sound.sfx.roar(); }
+        else { const dd = Math.min(Math.hypot(B.tx - B.x, B.ty - B.y), 420); B.tx = B.x + Math.cos(B.aim) * dd; B.ty = B.y + Math.sin(B.aim) * dd; }
+      }
+      return;
+    }
+    if (B.aphase === 'go') {
+      if (B.atk === 'stomp') {
+        const u = clamp(B.ast / CB.stompAir, 0, 1);
+        B.z = Math.sin(Math.PI * u) * 150;
+        moveBody(B, lerp(B.sx, B.tx, u) - B.x, lerp(B.sy, B.ty, u) - B.y, CB.cr, true);
+        if (u >= 1) {
+          B.z = 0; moveBody(B, 0, 0, CB.cr);
+          ring(B.x, B.y, 14, CB.stompR, 0.5, 'rgba(255,230,200,0.95)', 9);
+          burst(B.x, B.y - 6, 26, { s0: 80, s1: 260, l0: 0.4, l1: 0.9, z0: 8, z1: 16, color: 'rgba(210,190,150,0.85)', shape: 'dust', grow: 18 });
+          Sound.sfx.slam();
+          G.cam.shake = Math.max(G.cam.shake, 16); G.hitStop = Math.max(G.hitStop, 0.06);
+          if (G.state === 'playing' && Math.hypot(P.x - B.x, P.y - B.y) < CB.stompR + P.r) hurtPlayer(CB.stompDmg, B.x, B.y, 560);
+          // 着地のまわりに 小さな毒キノコ
+          for (let i = 0; i < (B.rage ? 4 : 2); i++) { const a = Math.random() * TAU; const x = B.x + Math.cos(a) * rr(90, 160); const y = B.y + Math.sin(a) * rr(70, 130); if (G.world.isOpen(x, y, 16) && !nearAnyMushroom(x, y, 26)) { const m = makeMushroom('poison', x, y, false); m.hidden = false; m.pop = 0; G.mushrooms.push(m); } }
+          B.aphase = 'rec'; B.ast = 0;
+        }
+      } else {
+        const r = moveBody(B, B.cvx * dt, B.cvy * dt, CB.cr);
+        if (Math.random() < dt * 50) addParticle({ x: B.x - B.cvx * 0.06, y: B.y - 2, vx: rr(-30, 30), vy: rr(-40, -5), ay: 0, drag: 0, life: 0.5, max: 0.5, size: rr(10, 18), grow: 20, color: 'rgba(210,190,150,0.7)', shape: 'dust', rot: 0, vr: 0 });
+        if (!B.hitDone && G.state === 'playing' && Math.hypot(P.x - B.x, P.y - B.y) < CB.cr + P.r + 10) { B.hitDone = true; hurtPlayer(CB.chargeDmg, B.x, B.y, 620); }
+        if (r.hit || r.water || B.ast >= CB.chargeTime) {
+          if (r.hit || r.water) { G.cam.shake = Math.max(G.cam.shake, 10); Sound.sfx.slam(); burst(B.x, B.y - 20, 14, { s0: 60, s1: 180, l0: 0.4, l1: 0.8, z0: 6, z1: 12, color: 'rgba(210,190,150,0.8)', shape: 'dust', grow: 14 }); }
+          B.aphase = 'rec'; B.ast = 0;
+        }
+      }
+      return;
+    }
+    // もどり: すき(ここが攻めどき)
+    if (B.ast >= (B.atk === 'charge' && B.hitDone === false ? 1.0 : 0.7) / (B.rage ? 1.2 : 1)) { B.atk = null; B.aphase = ''; }
+    pushPlayer(B, P, dx, dy, d);
   }
   function updateSpores(dt) {
     const keep = [];
@@ -383,6 +470,8 @@ const Features = (() => {
       s.x += s.vx * dt; s.y += s.vy * dt;
       s.vz -= 420 * dt; s.z += s.vz * dt;
       if (s.z <= 0) {
+        const P = G.player;
+        if (G.state === 'playing' && Math.hypot(P.x - s.x, P.y - s.y) < 34) hurtPlayer(C.boss.sporeDmg, s.x, s.y, 220);
         // 着地: 小さな毒キノコが生える
         if (G.world.isOpen(s.x, s.y, 16) && !nearAnyMushroom(s.x, s.y, 26)) { const m = makeMushroom('poison', s.x, s.y, false); m.hidden = false; m.pop = 0; G.mushrooms.push(m); }
         burst(s.x, s.y - 4, 6, { s0: 20, s1: 70, l0: 0.3, l1: 0.6, z0: 2, z1: 4, color: ['#c35cff', '#8a2be2'], shape: 'bubble', ay: -30 });
@@ -395,11 +484,13 @@ const Features = (() => {
   function hitBoss(p) {
     const B = G.boss;
     if (!B || B.dead) return;
+    if ((B.z || 0) > 60) return; // 空中では当たらない
     const weak = B.weak > 0;
-    const dmg = (p.dmg || 1) * (weak ? C.boss.weakMul : 1);
+    const dmg = Math.max(1, Math.round((p.dmg || 1) * (weak ? C.boss.weakMul : 1) * (p.melee ? C.boss.meleeMul : 1)));
     B.hp -= dmg; B.flash = 0.12; B.wob = 0.3;
     burst(p.x, p.y - 20, weak ? 14 : 6, { dir: Math.atan2(p.vy, p.vx), spread: 2.4, s0: 50, s1: 170, l0: 0.25, l1: 0.5, z0: 2, z1: 4.5, color: p.gold ? ['#ffe14d', '#fff'] : weak ? ['#ff3d9a', '#fff', '#ffe14d'] : ['#ff3d9a', '#ff9ad0'], shape: 'ink', ay: 260 });
-    if (weak) { floatText(p.x, p.y - 60, 'クリティカル! x' + C.boss.weakMul, '#ffe14d', 22); G.hitStop = Math.max(G.hitStop, 0.05); G.cam.shake = Math.max(G.cam.shake, 4); }
+    if (weak && !p.melee) { floatText(p.x, p.y - 60, 'クリティカル!', '#ffe14d', 22); G.hitStop = Math.max(G.hitStop, 0.05); G.cam.shake = Math.max(G.cam.shake, 4); }
+    B.lastDmg = dmg;
     Sound.sfx.hitEnemy();
     if (B.hp <= 0) defeatBoss();
   }
