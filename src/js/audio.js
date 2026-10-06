@@ -167,5 +167,10 @@ const Sound = (() => {
     try { localStorage.setItem('kinoko_mute', m ? '1' : '0'); } catch (e) { /* 無視 */ }
     if (master) master.gain.value = m ? 0 : 0.55;
   }
-  return { init, sfx, startBgm, stopBgm, setMuted, isMuted: () => muted };
+  // ポーズ中は 音を止める(画面が止まっているのに音だけ鳴りつづけないように)
+  function setPaused(p) {
+    if (!ctx) return;
+    try { if (p) ctx.suspend(); else ctx.resume(); } catch (e) { /* 無視 */ }
+  }
+  return { init, sfx, startBgm, stopBgm, setMuted, setPaused, isMuted: () => muted };
 })();

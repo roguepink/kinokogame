@@ -43,7 +43,7 @@ const Melee = (() => {
     };
     for (const e of G.enemies) if (isHostile(e) && e.z < 40) test(e.x, e.y, e.def.cr, e);
     const B = G.boss;
-    if (B && !B.dead && B.intro <= 0) test(B.x, B.y, G.stage === 2 ? Town.BOSS.cr : Features.C.boss.cr, B);
+    if (B && !B.dead && B.intro <= 0 && (B.z || 0) < 40) test(B.x, B.y, G.stage === 2 ? Town.BOSS.cr : Features.C.boss.cr, B);
     return best;
   }
 
@@ -96,12 +96,12 @@ const Melee = (() => {
       sw.hit.add(e); strikeEnemy(P, e, H, sw);
     }
     const B = G.boss;
-    if (B && !B.dead && B.intro <= 0 && !sw.hit.has(B) && inSweep(B.x, B.y - 30, B.hr * 0.7)) {
+    if (B && !B.dead && B.intro <= 0 && (B.z || 0) < 40 && !sw.hit.has(B) && inSweep(B.x, B.y - 30, B.hr * 0.7)) {
       sw.hit.add(B);
       const a = Math.atan2(B.y - 30 - P.y, B.x - P.x);
       Features.hitBoss({ x: B.x - Math.cos(a) * B.hr * 0.5, y: B.y - 10, vx: Math.cos(sw.angle) * 500, vy: Math.sin(sw.angle) * 500, dmg: H.dmg * (G.power > 0 ? 2 : 1), gold: G.power > 0, melee: true });
       sparks(P, B.x - Math.cos(a) * B.hr * 0.5, B.y - 40, sw.angle, H.finisher);
-      floatText(B.x + rr(-20, 20), B.y - 150, String(H.dmg * (G.power > 0 ? 2 : 1) * (B.weak > 0 ? Features.C.boss.weakMul : 1)), B.weak > 0 ? '#ffe14d' : '#fff', H.finisher ? 30 : 22);
+      floatText(B.x + rr(-20, 20), B.y - 150, String(B.lastDmg || 1), B.weak > 0 ? '#ffe14d' : '#fff', H.finisher ? 30 : 22);
       feel(P, H, sw, true);
     }
     for (const m of G.mushrooms) {

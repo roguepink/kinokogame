@@ -42,7 +42,8 @@ const Input = (() => {
       if (e.repeat) { if (MOVE_KEYS[e.code] || e.code === 'Space') e.preventDefault(); return; }
       if (MOVE_KEYS[e.code] || e.code === 'Space') e.preventDefault();
       keys.add(e.code);
-      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyL') dashReq = true;
+      // ダッシュ: E / Q / L(Shift は Windows で5回押すと「固定キー」画面が出てゲームが止まるので使わない)
+      if (e.code === 'KeyE' || e.code === 'KeyQ' || e.code === 'KeyL') dashReq = true;
       if (hooks.onKey) hooks.onKey(e.code);
     });
     window.addEventListener('keyup', (e) => keys.delete(e.code));

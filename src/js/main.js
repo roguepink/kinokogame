@@ -138,7 +138,7 @@ function saveBest(v) { try { localStorage.setItem('kinoko_best', String(v)); } c
 
 // ---------- 状態遷移 ----------
 function startGame() {
-  Sound.init();
+  Sound.init(); Sound.setPaused(false);
   Sound.sfx.start();
   Sound.startBgm();
   resetGame();
@@ -217,7 +217,7 @@ function refreshTitle() {
   document.querySelectorAll('[data-stage]').forEach((b) => { const n = +b.dataset.stage; b.classList.toggle('on', G.stage === n); b.classList.toggle('lock', n === 2 && !Meta.stage2Unlocked()); });
 }
 function toTitle() {
-  Sound.stopBgm();
+  Sound.stopBgm(); Sound.setPaused(false);
   G.state = 'title'; G.paused = false;
   resetGame();
   G.cam.x = G.player.x + 120; G.cam.y = G.player.y;
@@ -232,6 +232,7 @@ function setPaused(p) {
   if (G.state !== 'playing') return;
   G.paused = p;
   UI.show('pause', p);
+  Sound.setPaused(p);
   if (p) Input.releaseAll();
 }
 
@@ -315,11 +316,19 @@ function loop(ts) {
     let scale = 1;
     if (G.hitStop > 0) { G.hitStop -= dt; scale = 0.12; }
     let rem = dt * scale;
-    while (rem > 1e-6) { const h = Math.min(rem, 1 / 60); step(h); rem -= h; }
+    while (rem > 1e-6) { const h = Math.min(rem, 1 / 60); safe('step', () => step(h)); rem -= h; }
   }
-  Render.draw(G.clock);
-  if (G.state !== 'title') { Render.drawMini(); UI.updateHud(); }
-  else if (!UI.el.title.classList.contains('hidden')) drawTitleArt(G.clock);
+  safe('draw', () => Render.draw(G.clock));
+  if (G.state !== 'title') { safe('hud', () => { Render.drawMini(); UI.updateHud(); }); }
+  else if (!UI.el.title.classList.contains('hidden')) safe('title', () => drawTitleArt(G.clock));
+}
+// 思わぬエラーが起きても、そのフレームだけ飛ばして遊びつづけられるようにする
+const errLog = [];
+function safe(where, fn) {
+  try { fn(); } catch (e) {
+    if (errLog.length < 20) { errLog.push(where + ': ' + (e && e.message)); console.error(e); }
+    if (where === 'draw') { try { G.ctx.setTransform(1, 0, 0, 1, 0, 0); G.ctx.globalAlpha = 1; G.ctx.globalCompositeOperation = 'source-over'; G.noShadow = false; } catch (e2) { /* 無視 */ } }
+  }
 }
 
 // タイトル画面のイラスト: 刀を構えた主人公・どくキノコ・うさぎ(ゆれる)
@@ -406,7 +415,9 @@ function boot() {
   UI.el.btnStart.addEventListener('click', startGame);
   UI.el.btnRetry.addEventListener('click', startGame);
   UI.el.btnToTitle.addEventListener('click', toTitle);
-  UI.el.btnResume.addEventListener('click', () => setPaused(false));
+  UI.el.btnResume.addEventListener('click', (e) => { e.stopPropagation(); setPaused(false); });
+  // ポーズ画面は カードの外をタップしても つづける
+  UI.el.pause.addEventListener('click', (e) => { if (e.target === UI.el.pause) setPaused(false); });
   UI.el.btnQuit.addEventListener('click', toTitle);
   // ボタンにフォーカスが残ると、スペースキー(発射)でボタンが押されてしまうので外す
   UI.el.btnPause.addEventListener('click', (e) => { setPaused(!G.paused); e.currentTarget.blur(); });
@@ -437,7 +448,7 @@ function boot() {
 
 
   // 動作確認用: URL に ?debug を付けるとコンソールから状態を触れる
-  if (/[?&]debug/.test(location.search)) window.__kinoko = { perf, Features, Meta, Melee, purify, hitMushroom, refreshTitle, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
+  if (/[?&]debug/.test(location.search)) window.__kinoko = { errLog, perf, Features, Meta, Melee, purify, hitMushroom, refreshTitle, G, CONFIG, startGame, endGame, resetGame, spawnEnemy, makeEnemy, makeMushroom, makeCritter, setPaused, moveBody, step };
 
   requestAnimationFrame(loop);
 }

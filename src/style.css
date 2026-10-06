@@ -130,6 +130,7 @@ body.touch .mission { bottom: calc(150px + var(--safe-b)); max-width: 40vw; font
 .card { background: var(--cream); border: 4px solid var(--ink); border-radius: 26px; box-shadow: 0 9px 0 rgba(53, 40, 63, 0.85); padding: 16px 22px 18px; max-width: min(94vw, 680px); max-height: 96vh; overflow: auto; text-align: center; animation: pop 0.35s cubic-bezier(0.3, 1.5, 0.5, 1); }
 .card h2 { margin: 0 0 6px; font-size: clamp(26px, 6vw, 40px); }
 .card.small { min-width: min(80vw, 320px); }
+.pause-msg { margin: 0 0 4px; font-size: 14px; line-height: 1.5; }
 
 .logo-small { font-size: clamp(12px, 3vw, 16px); color: var(--pink); letter-spacing: 0.08em; }
 .logo h1 { margin: 0 0 4px; font-size: clamp(40px, 9.5vw, 72px); line-height: 1.05; letter-spacing: 0.02em; -webkit-text-stroke: 9px var(--ink); paint-order: stroke fill; text-shadow: 0 6px 0 rgba(53, 40, 63, 0.35); }

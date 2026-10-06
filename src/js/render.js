@@ -308,7 +308,11 @@ const Render = (() => {
       case 'crate': ctx.save(); ctx.translate(o.x, o.y); Art.drawCrate(ctx, o, t); ctx.restore(); break;
       case 'boss': {
         ctx.save(); ctx.translate(o.x, o.y);
+        const bz = o.z || 0;
+        if (bz > 0) { Art.shadow(ctx, 70 - bz * 0.15, 24 - bz * 0.05, 0.35, 0, 4); ctx.translate(0, -bz); G.noShadow = true; }
+        if (o.rage && !o.dead) { ctx.save(); ctx.globalAlpha = 0.35 + Math.sin(t * 12) * 0.15; Art.blit(ctx, Art.S.glowPoison, 0, -90, 2.4); ctx.restore(); }
         if (G.stage === 2) Town.drawBossYankee(ctx, o, t); else { ctx.scale(o.face || 1, 1); Art.drawBoss(ctx, o, t); }
+        G.noShadow = false;
         ctx.restore();
         break;
       }
@@ -452,6 +456,25 @@ const Render = (() => {
     }
     const B = G.boss;
     if (B && B.cloud > 0) { const k = Math.min(1, B.cloud / 0.6); zone(ctx, B.x, B.y, Features.C.boss.cloudR, `rgba(150,50,220,${0.5 * k})`, 'rgba(150,50,220,0)'); }
+    // ボスの大技の予告(赤いゾーン)
+    if (B && !B.dead && B.atk && (B.aphase === 'wind' || (B.atk === 'stomp' && B.aphase === 'go'))) {
+      const CB = Features.C.boss;
+      const u = B.aphase === 'wind' ? clamp(B.ast / B.windDur, 0, 1) : 1;
+      ctx.save();
+      ctx.fillStyle = `rgba(255,50,60,${0.18 + 0.1 * Math.sin(t * 22) + u * 0.12})`; ctx.strokeStyle = 'rgba(255,60,70,0.9)'; ctx.lineWidth = 3; ctx.setLineDash([12, 8]);
+      if (B.atk === 'stomp') {
+        let tx = B.tx; let ty = B.ty;
+        if (B.aphase === 'wind') { const dd = Math.min(Math.hypot(B.tx - B.x, B.ty - B.y), 420); tx = B.x + Math.cos(B.aim) * dd; ty = B.y + Math.sin(B.aim) * dd; }
+        ctx.beginPath(); ctx.ellipse(tx, ty, CB.stompR, CB.stompR * 0.8, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle = 'rgba(255,60,70,0.35)'; ctx.beginPath(); ctx.ellipse(tx, ty, CB.stompR * u, CB.stompR * 0.8 * u, 0, 0, TAU); ctx.fill();
+      } else {
+        const len = CB.chargeSpeed * CB.chargeTime * (B.rage ? 1.15 : 1);
+        ctx.translate(B.x, B.y); ctx.rotate(B.aim);
+        ctx.beginPath(); ctx.rect(0, -CB.cr - 6, len, (CB.cr + 6) * 2); ctx.fill(); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle = 'rgba(255,60,70,0.35)'; ctx.fillRect(0, -CB.cr - 6, len * u, (CB.cr + 6) * 2);
+      }
+      ctx.restore();
+    }
   }
 
   // ---------- 敵の攻撃予告(赤いゾーン) ----------
@@ -602,7 +625,7 @@ const Render = (() => {
     ctx.globalAlpha = 1;
   }
 
-  function drawProjectiles(ctx) {
+  function drawProjectiles(ctx, t) {
     const S = Art.S;
     for (const s of G.spores || []) {
       ctx.fillStyle = 'rgba(30,60,40,0.22)'; ctx.beginPath(); ctx.ellipse(s.x, s.y, 6, 3, 0, 0, TAU); ctx.fill();
@@ -805,7 +828,7 @@ const Render = (() => {
     }
     mark('objects');
     drawSlashes(ctx);
-    drawProjectiles(ctx);
+    drawProjectiles(ctx, t);
     drawParticles(ctx, left, top, right, bottom);
     drawAmbient(ctx, t);
     drawTexts(ctx);

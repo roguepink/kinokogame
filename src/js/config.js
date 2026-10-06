@@ -11,7 +11,7 @@ const CONFIG = {
 
   player: {
     r: 15, speed: 222, accel: 2600, decel: 3600, maxHp: 100,
-    // ダッシュ: 一瞬だけ速く走る(そのあいだ無敵)。Shift / 右クリック / 左がわを2回タップ
+    // ダッシュ: 一瞬だけ速く走る(そのあいだ無敵)。E / 右クリック / 左がわを2回タップ
     dash: { speed: 780, time: 0.17, cd: 0.6, invuln: 0.24 },
     invuln: 0.9,          // 被弾後の無敵時間
     slowMul: 0.5, slowTime: 6,   // 毒キノコを食べたとき

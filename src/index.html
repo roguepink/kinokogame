@@ -45,7 +45,7 @@
 
 <div id="toast" class="hidden"></div>
 <div id="banner" class="hidden"></div>
-<div id="hint" class="hidden"><span class="pc-only">WASD / 矢印キーで うごく ・ クリックで うつ ・ Shift で ダッシュ ・ 近くの てきは 日本刀で 斬る!</span><span class="touch-only">左がわで うごく ・ 右がわで ねらって うつ ・ 左を 2回タップで ダッシュ!</span></div>
+<div id="hint" class="hidden"><span class="pc-only">WASD / 矢印キーで うごく ・ クリックで うつ ・ E か 右クリックで ダッシュ ・ 近くの てきは 日本刀で 斬る!</span><span class="touch-only">左がわで うごく ・ 右がわで ねらって うつ ・ 左を 2回タップで ダッシュ!</span></div>
 
 <!-- タイトル -->
 <div id="title" class="overlay">
@@ -90,13 +90,13 @@
       <li class="gold"><canvas id="ic-gold" width="72" height="72"></canvas><b>金色のキノコ</b><span>にげる! たおすと<br>ゴールドパワー</span></li>
       <li class="boss-l"><canvas id="ic-boss" width="72" height="72"></canvas><b>キノコおやかた</b><span>のこり1ぷんで とうじょう。<br>かさを あげたら ねらえ</span></li>
       <li class="sword-l"><canvas id="ic-katana" width="72" height="72"></canvas><b>日本刀</b><span>てきが 近いと 自動で 刀に。<br>おしっぱなしで 3段コンボ</span></li>
-      <li><canvas id="ic-dash" width="72" height="72"></canvas><b>ダッシュ</b><span>Shift / 右クリック / 左を 2回タップ。<br>その間は 無敵</span></li>
+      <li><canvas id="ic-dash" width="72" height="72"></canvas><b>ダッシュ</b><span>E / 右クリック / 左を 2回タップ。<br>その間は 無敵</span></li>
       <li><canvas id="ic-crate" width="72" height="72"></canvas><b>武器の箱</b><span>ひろうと しばらく<br>武器が かわる</span></li>
       <li><canvas id="ic-map" width="72" height="72"></canvas><b>ミニマップ</b><span>むらさき: どくキノコ<br>あか: てき</span></li>
       <li class="enemy"><canvas id="ic-gorilla" width="72" height="72"></canvas><canvas id="ic-bear" width="72" height="72"></canvas><canvas id="ic-boar" width="72" height="72"></canvas><b>ゴリラ・クマ・イノシシ</b><span>こうげきされると ダメージ。<br>インクで おいはらおう</span></li>
     </ul>
     <div class="controls">
-      <div class="pc-only"><b>PC</b> WASD/矢印: うごく ・ マウス: ねらう ・ クリック/スペース: うつ(近くの てきは 斬る) ・ Shift/右クリック: ダッシュ ・ P: ポーズ</div>
+      <div class="pc-only"><b>PC</b> WASD/矢印: うごく ・ マウス: ねらう ・ クリック/スペース: うつ(近くの てきは 斬る) ・ E/右クリック: ダッシュ ・ P: ポーズ</div>
       <div class="touch-only"><b>スマホ</b> 左がわ ドラッグ: うごく ・ 右がわ ドラッグ: ねらって うつ(近くの てきは 斬る) ・ 左がわ 2回タップ: ダッシュ</div>
     </div>
     </div>
@@ -108,6 +108,7 @@
 <div id="pause" class="overlay hidden">
   <div class="card small">
     <h2>ポーズ</h2>
+    <p class="pause-msg">ゲームを とめています。<br>「つづける」で もどれるよ</p>
     <button id="btnResume" class="big-btn">つづける</button>
     <button id="btnQuit" class="sub-btn">タイトルへ</button>
   </div>
