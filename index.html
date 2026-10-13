@@ -2944,10 +2944,12 @@ const Sound = (() => {
   let timer = null;
   let nextTime = 0;
   let step = 0;
+  let paused = false; // ゲームがポーズ中
+  let away = false;   // 画面が見えていない(アプリ切り替え・別のタブ・戻るボタンでページを離れた)
   try { muted = localStorage.getItem('kinoko_mute') === '1'; } catch (e) { /* 保存できなくても遊べる */ }
 
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (ctx) { applyRun(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     try {
@@ -2961,7 +2963,17 @@ const Sound = (() => {
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    } catch (e) { ctx = null; }
+    } catch (e) { ctx = null; return; }
+    applyRun();
+  }
+  // ポーズ中・画面が見えていない間は 音をぜんぶ止める。どちらでもないときだけ鳴らす
+  // (タップで init() が呼ばれても、ポーズ中や裏にいる間は 勝手に鳴りださない)
+  function applyRun() {
+    if (!ctx) return;
+    try {
+      if (paused || away) { if (ctx.state === 'running') ctx.suspend(); }
+      else if (ctx.state !== 'running') ctx.resume(); // iPhone の 'interrupted' からも戻す
+    } catch (e) { /* 無視 */ }
   }
 
   function tone(freq, dur, type, vol, slideTo, delay, dest) {
@@ -3101,11 +3113,10 @@ const Sound = (() => {
     if (master) master.gain.value = m ? 0 : 0.55;
   }
   // ポーズ中は 音を止める(画面が止まっているのに音だけ鳴りつづけないように)
-  function setPaused(p) {
-    if (!ctx) return;
-    try { if (p) ctx.suspend(); else ctx.resume(); } catch (e) { /* 無視 */ }
-  }
-  return { init, sfx, startBgm, stopBgm, setMuted, setPaused, isMuted: () => muted };
+  function setPaused(p) { paused = !!p; applyRun(); }
+  // 画面が見えなくなったら止める。見えるようになっても、ポーズ中なら止めたまま
+  function setAway(a) { away = !!a; applyRun(); }
+  return { init, sfx, startBgm, stopBgm, setMuted, setPaused, setAway, isMuted: () => muted };
 })();
 
 /* ---- js/input.js ---- */
@@ -6756,6 +6767,7 @@ function endGame(reason) {
   G.over = { reason };
   G.overT = 0;
   Input.releaseAll();
+  Sound.stopBgm(); // 終わったら BGM は止める(結果画面で鳴りつづけない)
   if (reason === 'time') Sound.sfx.timeup(); else Sound.sfx.over();
   UI.show('hint', false);
   UI.banner(reason === 'time' ? 'タイムアップ!' : 'ダウン…');
@@ -7016,7 +7028,13 @@ function boot() {
 
   window.addEventListener('resize', () => { Render.resize(); });
   window.addEventListener('orientationchange', () => setTimeout(() => Render.resize(), 200));
-  document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); else if (G.state === 'playing') requestWakeLock(); });
+  // アプリ切り替え・別のタブ・画面オフ・戻るボタンでページを離れたときは、ポーズして音を止める。
+  // もどってきてもポーズのまま(つづけるボタンを押すまで音は鳴らない)
+  function goAway() { setPaused(true); Sound.setAway(true); }
+  function comeBack() { if (document.hidden) return; Sound.setAway(false); if (G.state === 'playing') requestWakeLock(); }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) goAway(); else comeBack(); });
+  window.addEventListener('pagehide', goAway);
+  window.addEventListener('pageshow', (e) => { if (e.persisted) comeBack(); });
   window.addEventListener('blur', () => { if (G.state === 'playing') setPaused(true); });
 
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');

@@ -11,10 +11,12 @@ const Sound = (() => {
   let timer = null;
   let nextTime = 0;
   let step = 0;
+  let paused = false; // ゲームがポーズ中
+  let away = false;   // 画面が見えていない(アプリ切り替え・別のタブ・戻るボタンでページを離れた)
   try { muted = localStorage.getItem('kinoko_mute') === '1'; } catch (e) { /* 保存できなくても遊べる */ }
 
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (ctx) { applyRun(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     try {
@@ -28,7 +30,17 @@ const Sound = (() => {
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    } catch (e) { ctx = null; }
+    } catch (e) { ctx = null; return; }
+    applyRun();
+  }
+  // ポーズ中・画面が見えていない間は 音をぜんぶ止める。どちらでもないときだけ鳴らす
+  // (タップで init() が呼ばれても、ポーズ中や裏にいる間は 勝手に鳴りださない)
+  function applyRun() {
+    if (!ctx) return;
+    try {
+      if (paused || away) { if (ctx.state === 'running') ctx.suspend(); }
+      else if (ctx.state !== 'running') ctx.resume(); // iPhone の 'interrupted' からも戻す
+    } catch (e) { /* 無視 */ }
   }
 
   function tone(freq, dur, type, vol, slideTo, delay, dest) {
@@ -168,9 +180,8 @@ const Sound = (() => {
     if (master) master.gain.value = m ? 0 : 0.55;
   }
   // ポーズ中は 音を止める(画面が止まっているのに音だけ鳴りつづけないように)
-  function setPaused(p) {
-    if (!ctx) return;
-    try { if (p) ctx.suspend(); else ctx.resume(); } catch (e) { /* 無視 */ }
-  }
-  return { init, sfx, startBgm, stopBgm, setMuted, setPaused, isMuted: () => muted };
+  function setPaused(p) { paused = !!p; applyRun(); }
+  // 画面が見えなくなったら止める。見えるようになっても、ポーズ中なら止めたまま
+  function setAway(a) { away = !!a; applyRun(); }
+  return { init, sfx, startBgm, stopBgm, setMuted, setPaused, setAway, isMuted: () => muted };
 })();
