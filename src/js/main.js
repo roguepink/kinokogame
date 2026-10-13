@@ -168,6 +168,7 @@ function endGame(reason) {
   G.over = { reason };
   G.overT = 0;
   Input.releaseAll();
+  Sound.stopBgm(); // 終わったら BGM は止める(結果画面で鳴りつづけない)
   if (reason === 'time') Sound.sfx.timeup(); else Sound.sfx.over();
   UI.show('hint', false);
   UI.banner(reason === 'time' ? 'タイムアップ!' : 'ダウン…');
@@ -428,7 +429,13 @@ function boot() {
 
   window.addEventListener('resize', () => { Render.resize(); });
   window.addEventListener('orientationchange', () => setTimeout(() => Render.resize(), 200));
-  document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); else if (G.state === 'playing') requestWakeLock(); });
+  // アプリ切り替え・別のタブ・画面オフ・戻るボタンでページを離れたときは、ポーズして音を止める。
+  // もどってきてもポーズのまま(つづけるボタンを押すまで音は鳴らない)
+  function goAway() { setPaused(true); Sound.setAway(true); }
+  function comeBack() { if (document.hidden) return; Sound.setAway(false); if (G.state === 'playing') requestWakeLock(); }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) goAway(); else comeBack(); });
+  window.addEventListener('pagehide', goAway);
+  window.addEventListener('pageshow', (e) => { if (e.persisted) comeBack(); });
   window.addEventListener('blur', () => { if (G.state === 'playing') setPaused(true); });
 
   UI.el.bestTitle.textContent = loadBest().toLocaleString('en-US');
