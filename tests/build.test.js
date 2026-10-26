@@ -15,8 +15,9 @@ const standalone = build();
 const artifact = build({ artifact: true });
 const inlineScripts = (h) => [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
 
-test('単体HTML: 外部ファイルを読み込まない(相対パスの script / stylesheet がない)', () => {
-  assert.ok(!/<script[^>]+src=/.test(standalone), '<script src> が残っている');
+test('単体HTML: 外部ファイルを読み込まない(はじめの画面の install.js だけは別ファイル)', () => {
+  const srcs = [...standalone.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepStrictEqual(srcs, ['install.js'], '<script src> が残っている: ' + srcs.join(', '));
   assert.ok(!/<link[^>]+rel="stylesheet"/.test(standalone), '<link stylesheet> が残っている');
 });
 
@@ -27,15 +28,17 @@ test('単体HTML: ゲームに必要な要素が入っている', () => {
 
 test('単体HTML: 中のスクリプトが構文として正しい', () => {
   const scripts = inlineScripts(standalone);
-  assert.strictEqual(scripts.length, 1);
-  new vm.Script(scripts[0]); // 構文エラーなら例外
-  for (const f of ['util', 'config', 'world', 'art', 'audio', 'input', 'entities', 'render', 'main']) assert.ok(scripts[0].includes(`---- js/${f}.js ----`), f);
+  assert.strictEqual(scripts.length, 2, 'はじめの画面の設定 + ゲーム本体');
+  for (const s of scripts) new vm.Script(s); // 構文エラーなら例外
+  assert.ok(scripts[0].includes('window.INSTALL_GATE'));
+  for (const f of ['util', 'config', 'world', 'art', 'audio', 'input', 'entities', 'render', 'main']) assert.ok(scripts[1].includes(`---- js/${f}.js ----`), f);
 });
 
 test('公開ページ用: <html>/<head>/<body> を含まず、先頭に title とスタイルがある', () => {
   assert.ok(!/<!doctype|<html|<head|<body/i.test(artifact));
   assert.ok(/^<title>[^<]+<\/title>/.test(artifact));
   assert.ok(artifact.includes('<style>'));
+  assert.ok(!artifact.includes('INSTALL_GATE') && !artifact.includes('install.js'), 'はじめの画面は入れない');
   const scripts = inlineScripts(artifact);
   assert.strictEqual(scripts.length, 1);
   new vm.Script(scripts[0]);

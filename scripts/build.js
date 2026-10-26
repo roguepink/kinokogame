@@ -23,7 +23,8 @@ function build(opts) {
 
   if (opts && opts.artifact) {
     const title = (html.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || 'どくキノコ大作戦';
-    const body = html.match(/<body>([\s\S]*)<\/body>/)[1].replace(scriptRe, '').trim();
+    // はじめの画面(インストールの案内)は GitHub Pages 用。claude.ai のページには入れない
+    const body = html.match(/<body>([\s\S]*)<\/body>/)[1].replace(/<!-- install-gate[\s\S]*?<!-- \/install-gate -->\s*/, '').replace(scriptRe, '').trim();
     return `<title>${title}</title>\n<style>\n/* 昼の森で固定したデザイン(ダークモード版は作っていない) */\n${css}</style>\n${body}\n<script>\n${js}\n</script>\n`;
   }
   const header = '<!-- このファイルは scripts/build.js が src/ から作ります。直接は編集しないでください。 -->\n';

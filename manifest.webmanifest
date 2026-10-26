@@ -1,0 +1,73 @@
+{
+  "name": "どくキノコ大作戦",
+  "short_name": "どくキノコ",
+  "description": "森にはえた毒キノコを、インクの水鉄砲でうちまくって、きれいにしていくゲーム。制限時間は3分。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./?app=kinokogame-1",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#86d257",
+  "theme_color": "#86d257",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "shots/1.jpg",
+      "sizes": "780x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "タイトル画面"
+    },
+    {
+      "src": "shots/2.jpg",
+      "sizes": "780x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "ゴリラとイノシシに気をつけて 森をおそうじ"
+    },
+    {
+      "src": "shots/3.jpg",
+      "sizes": "780x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "ボスの キノコおやかた"
+    },
+    {
+      "src": "shots/4.jpg",
+      "sizes": "780x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "近くの敵は 日本刀で ズバッ"
+    },
+    {
+      "src": "shots/5.jpg",
+      "sizes": "780x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "夕方から夜へ。ボスとの戦い"
+    }
+  ],
+  "categories": [
+    "games"
+  ]
+}

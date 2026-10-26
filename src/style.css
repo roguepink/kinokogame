@@ -319,3 +319,6 @@ body.touch #touchHints.show { display: block; }
   .th { width: 96px; height: 96px; }
   #touchHints { height: 96px; bottom: calc(14px + var(--safe-b)); }
 }
+
+/* はじめの画面の「ホーム画面に入れる方法」の案内は 暗い色の上に出るので、字を白に */
+#igHelp { color: #fff; }
