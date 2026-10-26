@@ -5,8 +5,8 @@
  * 使い方: index.html の </body> の前に
  *   <script>window.INSTALL_GATE = { id:'sokai', name:'爽快ゾンビ無双', icon:'icon-192.png',
  *     tagline:'3Dの ゾンビ無双アクション', desc:'…', points:['…','…'], shots:['shots/1.jpg','shots/2.jpg'],
- *     badges:['無料','広告なし','登録なし'], color:'#ff5a1f', onPlay: function(){} };</script>
- *   <script src="install.js"></script>
+ *     badges:['無料','広告なし','登録なし'], color:'#ff5a1f', onPlay: function(){} };  (← script タグの中に書く)
+ *   そのあとに install.js を script タグ(src="install.js")で読む
  *
  * - 英語のアプリは lang:'en' を足す(はじめの画面の文字・案内が英語になる)。書かなければ 日本語(今までどおり)
  * - shield:true を足すと、はじめの画面・案内にふれても うしろのアプリに伝えない(「このまま…」のボタンだけは伝える)。
@@ -116,6 +116,7 @@
     '.ig-large .ig-btns{flex-direction:column;gap:12px}.ig-large .ig-btn{font-size:21px;padding:17px 10px}' +
     '.ig-large .ig-note{font-size:15px;opacity:.85}.ig-large .ig-desc{font-size:18px;line-height:1.8}.ig-large .ig-points li{font-size:17px;opacity:.95}' +
     '.ig-large .ig-foot button{font-size:15px}.ig-large .ig-shots img{height:190px}' +
+    '@media (max-width:359px){.ig-large .ig-name{font-size:21px}.ig-large .ig-icon{width:64px;height:64px}}' +
     '#igHelp.ig-large .ig-step{font-size:18px}#igHelp.ig-large .ig-card h3{font-size:20px}#igHelp.ig-large .ig-btns{flex-direction:column}#igHelp.ig-large .ig-btn{font-size:19px}';
 
   var SHARE_SVG = '<svg class="ig-ico" viewBox="0 0 24 24" fill="none" stroke="#4da3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11v9h12v-9"/></svg>';
